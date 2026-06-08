@@ -177,30 +177,7 @@ pub fn handleList(io: std.Io, allocator: std.mem.Allocator) !void {
         }
 
         std.debug.print("\n=== Lista de plantas ({d}) ===\n", .{plantas.len});
-
-        for (plantas, 0..) |plant, i| {
-            std.debug.print("{d} {s}\n", .{ i + 1, plant.nombre_comun });
-            std.debug.print("    ID:     {s}\n", .{plant.id});
-            std.debug.print("    Tipo:    {s}\n", .{@tagName(plant.tipo)});
-            std.debug.print("    Zona:    {s}\n", .{plant.zona_ubicacion});
-
-            if (plant.especie) |esp| {
-                std.debug.print("     Especie: {s}\n", .{esp});
-            }
-
-            if (plant.altura_actual_cm) |h| {
-                std.debug.print("    Altura: {d} cm\n", .{h});
-            }
-
-            std.debug.print("    Nativo: {s}\n", .{if (plant.nativo) "Sí" else "No"});
-
-            if (plant.notas) |n| {
-                std.debug.print("    Notas: {s}\n", .{n});
-            }
-
-            std.debug.print("    Eventos en bitácora: {d}\n", .{plant.bitacora.len});
-            std.debug.print("\n", .{});
-        }
+        for (plantas) |plant| printPlant(&plant); 
     } else |_| {
         std.debug.print("DB file might not be ready.", .{});
     }
@@ -232,9 +209,7 @@ fn printPlant(plant: *const Planta) void {
 
 fn findPlantById(plants: []const Planta, plantId: []const u8) ?*const Planta {
     for (plants) |*plant| {
-        if (std.mem.eql(u8, plant.id, plantId)) {
-            return plant;
-        }
+        if (std.mem.eql(u8, plant.id, plantId)) return plant;
     }
     return null;
 }
