@@ -169,8 +169,37 @@ pub fn handleList(io: std.Io, allocator: std.mem.Allocator) !void {
         const parsed = try std.json.parseFromSlice([]Planta, allocator, contenido, .{});
         defer parsed.deinit();
 
-        for (parsed.value) |plant| {
-            std.debug.print("Planta: {any}\n", .{plant});
+        const plantas = parsed.value;
+
+        if (plantas.len == 0) {
+            std.debug.print("No hay plantas o árboles registrados.\n", .{});
+            return;
+        }
+
+        std.debug.print("\n=== Lista de plantas ({d}) ===\n", .{plantas.len});
+
+        for (plantas, 0..) |plant, i| {
+            std.debug.print("{d} {s}\n", .{ i + 1, plant.nombre_comun });
+            std.debug.print("    ID:     {s}\n", .{ plant.id });
+            std.debug.print("    Tipo:    {s}\n", .{ @tagName(plant.tipo) });
+            std.debug.print("    Zona:    {s}\n", .{ plant.zona_ubicacion });
+
+            if (plant.especie) |esp| {
+                std.debug.print("     Especie: {s}\n", .{ esp });
+            }
+
+            if (plant.altura_actual_cm) |h| {
+                std.debug.print("    Altura: {d} cm\n", .{ h });
+            }
+
+            std.debug.print("    Nativo: {s}\n", .{ if (plant.nativo) "Sí" else "No" });
+
+            if (plant.notas) |n| {
+                std.debug.print("    Notas: {s}\n", .{ n });
+            }
+
+            std.debug.print("    Eventos en bitácora: {d}\n", .{ plant.bitacora.len });
+            std.debug.print("\n", .{});
         }
     } else |_| {
         std.debug.print("DB file might not be ready.", .{});
