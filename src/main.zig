@@ -18,6 +18,8 @@ pub fn main(init: std.process.Init) !void {
         try plants.handleAdd(init.io, &iter, allocator);
     } else if (std.mem.eql(u8, comando, "list")) {
         try plants.handleList(init.io, allocator);
+    } else if (std.mem.eql(u8, comando, "show")) {
+        try plants.handleShowPlantById(init.io, &iter, allocator);
     } else {
         std.debug.print("Comando desconocido: {s}\n", .{comando});
     }

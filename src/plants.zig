@@ -14,7 +14,7 @@ pub const TipoEvento = enum {
 };
 
 pub const EventoCuidado = struct {
-    fecha: []const u8,                    // Por ahora usamos string "2025-06-06"
+    fecha: []const u8, // Por ahora usamos string "2025-06-06"
     tipo: TipoEvento,
     cantidad_litros: ?u32 = null,
     notas: ?[]const u8 = null,
@@ -24,7 +24,7 @@ pub const Planta = struct {
     id: []const u8,
     tipo: TipoPlanta,
     nombre_comun: []const u8,
-    especie: ?[]const u8 = null,            // this is equivalent to a Option<String> in rust
+    especie: ?[]const u8 = null, // this is equivalent to a Option<String> in rust
     nativo: bool = false,
     zona_ubicacion: []const u8,
     fecha_plantado: ?[]const u8 = null,
@@ -180,28 +180,88 @@ pub fn handleList(io: std.Io, allocator: std.mem.Allocator) !void {
 
         for (plantas, 0..) |plant, i| {
             std.debug.print("{d} {s}\n", .{ i + 1, plant.nombre_comun });
-            std.debug.print("    ID:     {s}\n", .{ plant.id });
-            std.debug.print("    Tipo:    {s}\n", .{ @tagName(plant.tipo) });
-            std.debug.print("    Zona:    {s}\n", .{ plant.zona_ubicacion });
+            std.debug.print("    ID:     {s}\n", .{plant.id});
+            std.debug.print("    Tipo:    {s}\n", .{@tagName(plant.tipo)});
+            std.debug.print("    Zona:    {s}\n", .{plant.zona_ubicacion});
 
             if (plant.especie) |esp| {
-                std.debug.print("     Especie: {s}\n", .{ esp });
+                std.debug.print("     Especie: {s}\n", .{esp});
             }
 
             if (plant.altura_actual_cm) |h| {
-                std.debug.print("    Altura: {d} cm\n", .{ h });
+                std.debug.print("    Altura: {d} cm\n", .{h});
             }
 
-            std.debug.print("    Nativo: {s}\n", .{ if (plant.nativo) "Sí" else "No" });
+            std.debug.print("    Nativo: {s}\n", .{if (plant.nativo) "Sí" else "No"});
 
             if (plant.notas) |n| {
-                std.debug.print("    Notas: {s}\n", .{ n });
+                std.debug.print("    Notas: {s}\n", .{n});
             }
 
-            std.debug.print("    Eventos en bitácora: {d}\n", .{ plant.bitacora.len });
+            std.debug.print("    Eventos en bitácora: {d}\n", .{plant.bitacora.len});
             std.debug.print("\n", .{});
         }
     } else |_| {
         std.debug.print("DB file might not be ready.", .{});
+    }
+}
+
+fn printPlant(plant: *const Planta) void {
+    std.debug.print("{s}\n", .{plant.nombre_comun});
+    std.debug.print("    ID:     {s}\n", .{plant.id});
+    std.debug.print("    Tipo:    {s}\n", .{@tagName(plant.tipo)});
+    std.debug.print("    Zona:    {s}\n", .{plant.zona_ubicacion});
+
+    if (plant.especie) |esp| {
+        std.debug.print("     Especie: {s}\n", .{esp});
+    }
+
+    if (plant.altura_actual_cm) |h| {
+        std.debug.print("    Altura: {d} cm\n", .{h});
+    }
+
+    std.debug.print("    Nativo: {s}\n", .{if (plant.nativo) "Sí" else "No"});
+
+    if (plant.notas) |n| {
+        std.debug.print("    Notas: {s}\n", .{n});
+    }
+
+    std.debug.print("    Eventos en bitácora: {d}\n", .{plant.bitacora.len});
+    std.debug.print("\n", .{});
+}
+
+fn findPlantById(plants: []const Planta, plantId: []const u8) ?*const Planta {
+    for (plants) |*plant| {
+        if (std.mem.eql(u8, plant.id, plantId)) {
+            return plant;
+        }
+    }
+    return null;
+}
+
+pub fn handleShowPlantById(io: std.Io, iter: anytype, allocator: std.mem.Allocator) !void {
+    const plant_id_str = iter.next() orelse {
+        std.debug.print("Error: el id de la planta|árbol a mostrar\n", .{});
+        return;
+    };
+
+    //std.debug.print("Id a mostrar: {s}\n", .{plant_id_str});
+
+    const path = "plants.json";
+    if (std.Io.Dir.cwd().access(io, path, .{})) {
+        const contenido = try std.Io.Dir.cwd().readFileAlloc(io, path, allocator, .limited(1024 * 1024));
+        defer allocator.free(contenido);
+
+        const parsed = try std.json.parseFromSlice([]Planta, allocator, contenido, .{});
+        defer parsed.deinit();
+        const plantas = parsed.value;
+
+        if (findPlantById(plantas, plant_id_str)) |plant| {
+            printPlant(plant);
+        } else {
+            std.debug.print("Planta no encontrada ... :(\n", .{});
+        }
+    } else |_| {
+        std.debug.print("DB file might not be ready.\n", .{});
     }
 }
