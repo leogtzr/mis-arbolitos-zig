@@ -34,16 +34,22 @@ pub const Planta = struct {
     bitacora: []EventoCuidado = &.{},
 };
 
-pub fn handleAdd(io: std.Io, iter: anytype, allocator: std.mem.Allocator) !void {
+pub fn handleAdd(
+    io: std.Io, 
+    iter: anytype, 
+    allocator: std.mem.Allocator, 
+    stdout: *std.Io.Writer, 
+    stderr: *std.Io.Writer
+    ) !void {
     // 1. Obtener el tipo:
     const tipo_str = iter.next() orelse {
-        std.debug.print("Error: falta el tipo (arbol|arbusto)\n", .{});
+        try stderr.print("Error: falta el tipo (arbol|arbusto)\n", .{});
         return;
     };
 
     // 2. Obtener nombre (obligatorio)
     const nombre = iter.next() orelse {
-        std.debug.print("Error: falta el nombre de la planta\n", .{});
+        try stderr.print("Error: falta el nombre de la planta\n", .{});
         return;
     };
 
@@ -58,49 +64,49 @@ pub fn handleAdd(io: std.Io, iter: anytype, allocator: std.mem.Allocator) !void 
     while (iter.next()) |arg| {
         if (std.mem.eql(u8, arg, "--zona")) {
             zona = iter.next() orelse {
-                std.debug.print("Error: --zona requiere un valor\n", .{});
+                try stderr.print("Error: --zona requiere un valor\n", .{});
                 return;
             };
         } else if (std.mem.eql(u8, arg, "--altura")) {
             const altura_str = iter.next() orelse {
-                std.debug.print("Error: --altura requiere un valor\n", .{});
+                try stderr.print("Error: --altura requiere un valor\n", .{});
                 return;
             };
             altura = std.fmt.parseInt(u32, altura_str, 10) catch {
-                std.debug.print("Error: --altura debe ser un número\n", .{});
+                try stderr.print("Error: --altura debe ser un número\n", .{});
                 return;
             };
         } else if (std.mem.eql(u8, arg, "--nativo")) {
             nativo = true;
         } else if (std.mem.eql(u8, arg, "--notas")) {
             notas = iter.next() orelse {
-                std.debug.print("Error: --notas requiere un valor\n", .{});
+                try stderr.print("Error: --notas requiere un valor\n", .{});
                 return;
             };
         } else if (std.mem.eql(u8, arg, "--especie")) {
             especie = iter.next() orelse {
-                std.debug.print("Error: --especie requiere un valor\n", .{});
+                try stderr.print("Error: --especie requiere un valor\n", .{});
                 return;
             };
         } else {
-            std.debug.print("Opción desconocida: {s}\n", .{arg});
+            try stderr.print("Opción desconocida: {s}\n", .{arg});
         }
     }
 
     // 5. Crear la planta (por ahora solo la imprimimos)
-    std.debug.print("=== Nueva Planta ===\n", .{});
-    std.debug.print("Tipo: {s}\n", .{tipo_str});
-    std.debug.print("Nombre: {s}\n", .{nombre});
-    std.debug.print("Zona: {s}\n", .{zona});
-    std.debug.print("Altura: {?}\n", .{altura});
-    std.debug.print("Nativo: {}\n", .{nativo});
+    try stdout.print("=== Nueva Planta ===\n", .{});
+    try stdout.print("Tipo: {s}\n", .{tipo_str});
+    try stdout.print("Nombre: {s}\n", .{nombre});
+    try stdout.print("Zona: {s}\n", .{zona});
+    try stdout.print("Altura: {?}\n", .{altura});
+    try stdout.print("Nativo: {}\n", .{nativo});
 
     if (especie) |e| {
-        std.debug.print("Especie: {s}\n", .{e});
+        try stdout.print("Especie: {s}\n", .{e});
     }
 
     if (notas) |n| {
-        std.debug.print("Notas: {s}\n", .{n});
+        try stdout.print("Notas: {s}\n", .{n});
     }
 
     const ts = std.Io.Clock.real.now(io);
@@ -119,10 +125,16 @@ pub fn handleAdd(io: std.Io, iter: anytype, allocator: std.mem.Allocator) !void 
         .notas = notas,
     };
 
-    try guardarPlanta(planta, io, allocator);
+    try guardarPlanta(planta, io, allocator, stdout, stderr);
 }
 
-fn guardarPlanta(nueva_planta: Planta, io: std.Io, allocator: std.mem.Allocator) !void {
+fn guardarPlanta(
+    nueva_planta: Planta, 
+    io: std.Io, 
+    allocator: std.mem.Allocator, 
+    stdout: *std.Io.Writer, 
+    stderr: *std.Io.Writer
+    ) !void {
     const path = "plants.json";
 
     // 1. Leer plantas existentes (si el archivo existe)
@@ -142,7 +154,7 @@ fn guardarPlanta(nueva_planta: Planta, io: std.Io, allocator: std.mem.Allocator)
         parsed = try std.json.parseFromSlice([]Planta, allocator, contenido.?, .{});
         try plantas.appendSlice(allocator, parsed.?.value);
     } else |_| {
-        std.debug.print("File does not exist ..., starting from scratch.\n", .{});
+        try stderr.print("File does not exist ..., starting from scratch.\n", .{});
     }
 
     // 2. Agregar la nueva planta
@@ -157,10 +169,15 @@ fn guardarPlanta(nueva_planta: Planta, io: std.Io, allocator: std.mem.Allocator)
     try std.json.Stringify.value(plantas.items, .{ .whitespace = .indent_2 }, &fw.interface);
     try fw.interface.flush();
 
-    std.debug.print("Planta guardada exitosamente en {s}\n", .{path});
+    try stdout.print("Planta guardada exitosamente en {s}\n", .{path});
 }
 
-pub fn handleList(io: std.Io, allocator: std.mem.Allocator) !void {
+pub fn handleList(
+    io: std.Io, 
+    allocator: std.mem.Allocator, 
+    stdout: *std.Io.Writer, 
+    stderr: *std.Io.Writer
+    ) !void {
     const path = "plants.json";
     if (std.Io.Dir.cwd().access(io, path, .{})) {
         const contenido = try std.Io.Dir.cwd().readFileAlloc(io, path, allocator, .limited(1024 * 1024));
@@ -172,39 +189,39 @@ pub fn handleList(io: std.Io, allocator: std.mem.Allocator) !void {
         const plantas = parsed.value;
 
         if (plantas.len == 0) {
-            std.debug.print("No hay plantas o árboles registrados.\n", .{});
+            try stderr.print("No hay plantas o árboles registrados.\n", .{});
             return;
         }
 
-        std.debug.print("\n=== Lista de plantas ({d}) ===\n", .{plantas.len});
-        for (plantas) |plant| printPlant(&plant); 
+        try stdout.print("\n=== Lista de plantas ({d}) ===\n", .{plantas.len});
+        for (plantas) |plant| try printPlant(&plant, stdout); 
     } else |_| {
-        std.debug.print("DB file might not be ready.", .{});
+        try stderr.print("DB file might not be ready.", .{});
     }
 }
 
-fn printPlant(plant: *const Planta) void {
-    std.debug.print("{s}\n", .{plant.nombre_comun});
-    std.debug.print("    ID:     {s}\n", .{plant.id});
-    std.debug.print("    Tipo:    {s}\n", .{@tagName(plant.tipo)});
-    std.debug.print("    Zona:    {s}\n", .{plant.zona_ubicacion});
+fn printPlant(plant: *const Planta, stdout: *std.Io.Writer) !void {
+    try stdout.print("{s}\n", .{plant.nombre_comun});
+    try stdout.print("    ID:     {s}\n", .{plant.id});
+    try stdout.print("    Tipo:    {s}\n", .{@tagName(plant.tipo)});
+    try stdout.print("    Zona:    {s}\n", .{plant.zona_ubicacion});
 
     if (plant.especie) |esp| {
-        std.debug.print("     Especie: {s}\n", .{esp});
+        try stdout.print("     Especie: {s}\n", .{esp});
     }
 
     if (plant.altura_actual_cm) |h| {
-        std.debug.print("    Altura: {d} cm\n", .{h});
+        try stdout.print("    Altura: {d} cm\n", .{h});
     }
 
-    std.debug.print("    Nativo: {s}\n", .{if (plant.nativo) "Sí" else "No"});
+    try stdout.print("    Nativo: {s}\n", .{if (plant.nativo) "Sí" else "No"});
 
     if (plant.notas) |n| {
-        std.debug.print("    Notas: {s}\n", .{n});
+        try stdout.print("    Notas: {s}\n", .{n});
     }
 
-    std.debug.print("    Eventos en bitácora: {d}\n", .{plant.bitacora.len});
-    std.debug.print("\n", .{});
+    try stdout.print("    Eventos en bitácora: {d}\n", .{plant.bitacora.len});
+    try stdout.print("\n", .{});
 }
 
 fn findPlantById(plants: []const Planta, plantId: []const u8) ?*const Planta {
@@ -214,13 +231,16 @@ fn findPlantById(plants: []const Planta, plantId: []const u8) ?*const Planta {
     return null;
 }
 
-pub fn handleShowPlantById(io: std.Io, iter: anytype, allocator: std.mem.Allocator) !void {
+pub fn handleShowPlantById(
+    io: std.Io, 
+    iter: anytype, 
+    allocator: std.mem.Allocator, 
+    stdout: *std.Io.Writer, 
+    stderr: *std.Io.Writer) !void {
     const plant_id_str = iter.next() orelse {
-        std.debug.print("Error: el id de la planta|árbol a mostrar\n", .{});
+        try stderr.print("Error: el id de la planta|árbol a mostrar\n", .{});
         return;
     };
-
-    //std.debug.print("Id a mostrar: {s}\n", .{plant_id_str});
 
     const path = "plants.json";
     if (std.Io.Dir.cwd().access(io, path, .{})) {
@@ -232,11 +252,11 @@ pub fn handleShowPlantById(io: std.Io, iter: anytype, allocator: std.mem.Allocat
         const plantas = parsed.value;
 
         if (findPlantById(plantas, plant_id_str)) |plant| {
-            printPlant(plant);
+            try printPlant(plant, stdout);
         } else {
-            std.debug.print("Planta no encontrada ... :(\n", .{});
+            try stderr.print("Planta no encontrada ... :(\n", .{});
         }
     } else |_| {
-        std.debug.print("DB file might not be ready.\n", .{});
+        try stderr.print("DB file might not be ready.\n", .{});
     }
 }
