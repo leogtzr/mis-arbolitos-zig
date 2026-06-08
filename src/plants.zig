@@ -1,9 +1,5 @@
 const std = @import("std");
 
-// ============================================
-// Enums:
-// ============================================
-
 pub const TipoPlanta = enum {
     arbol,
     arbusto,
@@ -17,20 +13,12 @@ pub const TipoEvento = enum {
     otro,
 };
 
-// ============================================
-// Evento de cuidado (bitácora)
-// ============================================
-
 pub const EventoCuidado = struct {
     fecha: []const u8,                    // Por ahora usamos string "2025-06-06"
     tipo: TipoEvento,
     cantidad_litros: ?u32 = null,
     notas: ?[]const u8 = null,
 };
-
-// ============================================
-// Planta (estructura principal)
-// ============================================
 
 pub const Planta = struct {
     id: []const u8,
