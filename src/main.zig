@@ -6,17 +6,17 @@ pub fn main(init: std.process.Init) !void {
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
-    var stdout_buff: [1024]u8 = undefined;
-    var stderr_buff: [1024]u8 = undefined;
+    var stdoutBuff: [1024]u8 = undefined;
+    var stderrBuff: [1024]u8 = undefined;
 
     const io = init.io;
 
-    var stdout_fw = std.Io.File.stdout().writer(io, &stdout_buff);
-    var stderr_fw = std.Io.File.stderr().writer(io, &stderr_buff);
+    var stdoutFw = std.Io.File.stdout().writer(io, &stdoutBuff);
+    var stderrFw = std.Io.File.stderr().writer(io, &stderrBuff);
 
     // Some aliases:
-    const stdout = &stdout_fw.interface;
-    const stderr = &stderr_fw.interface;
+    const stdout = &stdoutFw.interface;
+    const stderr = &stderrFw.interface;
 
     defer stdout.flush() catch {};
     defer stderr.flush() catch {};

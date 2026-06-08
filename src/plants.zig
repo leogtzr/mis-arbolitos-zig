@@ -16,21 +16,21 @@ pub const TipoEvento = enum {
 pub const EventoCuidado = struct {
     fecha: []const u8, // Por ahora usamos string "2025-06-06"
     tipo: TipoEvento,
-    cantidad_litros: ?u32 = null,
+    cantidadLitros: ?u32 = null,
     notas: ?[]const u8 = null,
 };
 
 pub const Planta = struct {
     id: []const u8,
     tipo: TipoPlanta,
-    nombre_comun: []const u8,
+    nombreComun: []const u8,
     especie: ?[]const u8 = null, // this is equivalent to a Option<String> in rust
     nativo: bool = false,
-    zona_ubicacion: []const u8,
-    fecha_plantado: ?[]const u8 = null,
-    altura_actual_cm: ?u32 = null,
+    zonaUbicacion: []const u8,
+    fechaPlantado: ?[]const u8 = null,
+    alturaActualCm: ?u32 = null,
     notas: ?[]const u8 = null,
-    urls_documentacion: []const []const u8 = &.{},
+    urlsDocumentacion: []const []const u8 = &.{},
     bitacora: []EventoCuidado = &.{},
 };
 
@@ -42,7 +42,7 @@ pub fn handleAdd(
     stderr: *std.Io.Writer
     ) !void {
     // 1. Obtener el tipo:
-    const tipo_str = iter.next() orelse {
+    const tipoStr = iter.next() orelse {
         try stderr.print("Error: falta el tipo (arbol|arbusto)\n", .{});
         return;
     };
@@ -68,11 +68,11 @@ pub fn handleAdd(
                 return;
             };
         } else if (std.mem.eql(u8, arg, "--altura")) {
-            const altura_str = iter.next() orelse {
+            const alturaStr = iter.next() orelse {
                 try stderr.print("Error: --altura requiere un valor\n", .{});
                 return;
             };
-            altura = std.fmt.parseInt(u32, altura_str, 10) catch {
+            altura = std.fmt.parseInt(u32, alturaStr, 10) catch {
                 try stderr.print("Error: --altura debe ser un número\n", .{});
                 return;
             };
@@ -95,7 +95,7 @@ pub fn handleAdd(
 
     // 5. Crear la planta (por ahora solo la imprimimos)
     try stdout.print("=== Nueva Planta ===\n", .{});
-    try stdout.print("Tipo: {s}\n", .{tipo_str});
+    try stdout.print("Tipo: {s}\n", .{tipoStr});
     try stdout.print("Nombre: {s}\n", .{nombre});
     try stdout.print("Zona: {s}\n", .{zona});
     try stdout.print("Altura: {?}\n", .{altura});
@@ -116,12 +116,12 @@ pub fn handleAdd(
 
     const planta = Planta{
         .id = id,
-        .tipo = if (std.mem.eql(u8, tipo_str, "arbol")) .arbol else .arbusto,
-        .nombre_comun = nombre,
+        .tipo = if (std.mem.eql(u8, tipoStr, "arbol")) .arbol else .arbusto,
+        .nombreComun = nombre,
         .especie = especie,
         .nativo = nativo,
-        .zona_ubicacion = zona,
-        .altura_actual_cm = altura,
+        .zonaUbicacion = zona,
+        .alturaActualCm = altura,
         .notas = notas,
     };
 
@@ -129,7 +129,7 @@ pub fn handleAdd(
 }
 
 fn guardarPlanta(
-    nueva_planta: Planta, 
+    nuevaPlanta: Planta, 
     io: std.Io, 
     allocator: std.mem.Allocator, 
     stdout: *std.Io.Writer, 
@@ -158,7 +158,7 @@ fn guardarPlanta(
     }
 
     // 2. Agregar la nueva planta
-    try plantas.append(allocator, nueva_planta);
+    try plantas.append(allocator, nuevaPlanta);
 
     // 3. Convertir a JSON y guardar
     const archivo = try std.Io.Dir.cwd().createFile(io, path, .{ .truncate = true });
@@ -201,16 +201,16 @@ pub fn handleList(
 }
 
 fn printPlant(plant: *const Planta, stdout: *std.Io.Writer) !void {
-    try stdout.print("{s}\n", .{plant.nombre_comun});
+    try stdout.print("{s}\n", .{plant.nombreComun});
     try stdout.print("    ID:     {s}\n", .{plant.id});
     try stdout.print("    Tipo:    {s}\n", .{@tagName(plant.tipo)});
-    try stdout.print("    Zona:    {s}\n", .{plant.zona_ubicacion});
+    try stdout.print("    Zona:    {s}\n", .{plant.zonaUbicacion});
 
     if (plant.especie) |esp| {
         try stdout.print("     Especie: {s}\n", .{esp});
     }
 
-    if (plant.altura_actual_cm) |h| {
+    if (plant.alturaActualCm) |h| {
         try stdout.print("    Altura: {d} cm\n", .{h});
     }
 
@@ -237,7 +237,7 @@ pub fn handleShowPlantById(
     allocator: std.mem.Allocator, 
     stdout: *std.Io.Writer, 
     stderr: *std.Io.Writer) !void {
-    const plant_id_str = iter.next() orelse {
+    const plantIdStr = iter.next() orelse {
         try stderr.print("Error: el id de la planta|árbol a mostrar\n", .{});
         return;
     };
@@ -251,7 +251,7 @@ pub fn handleShowPlantById(
         defer parsed.deinit();
         const plantas = parsed.value;
 
-        if (findPlantById(plantas, plant_id_str)) |plant| {
+        if (findPlantById(plantas, plantIdStr)) |plant| {
             try printPlant(plant, stdout);
         } else {
             try stderr.print("Planta no encontrada ... :(\n", .{});
