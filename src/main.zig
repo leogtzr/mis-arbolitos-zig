@@ -35,6 +35,10 @@ pub fn main(init: std.process.Init) !void {
         try plants.handleList(init.io, allocator, stdout, stderr);
     } else if (std.mem.eql(u8, comando, "show")) {
         try plants.handleShowPlantById(init.io, &iter, allocator, stdout, stderr);
+    } else if (std.mem.eql(u8, comando, "log")) {
+        try plants.handleLog(init.io, &iter, allocator, stdout, stderr);
+    } else if (std.mem.eql(u8, comando, "edit")) {
+        try plants.handleEdit(init.io, &iter, allocator, stdout, stderr);
     } else {
         try stderr.print("Comando desconocido: {s}\n", .{comando});
     }
