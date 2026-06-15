@@ -59,6 +59,7 @@ pub fn handleAdd(
     var nativo: bool = false;
     var notas: ?[]const u8 = null;
     var especie: ?[]const u8 = null;
+    var fechaPlantado: ?[]const u8 = null;
 
     // 4. Parsear opciones (--zona, --altura, --nativo, etc.)
     while (iter.next()) |arg| {
@@ -86,6 +87,11 @@ pub fn handleAdd(
         } else if (std.mem.eql(u8, arg, "--especie")) {
             especie = iter.next() orelse {
                 try stderr.print("Error: --especie requiere un valor\n", .{});
+                return;
+            };
+        } else if (std.mem.eql(u8, arg, "--fecha-plantado")) {
+            fechaPlantado = iter.next() orelse {
+                try stderr.print("Error: --fecha-plantado requiere un valor.\n", .{});
                 return;
             };
         } else {
@@ -122,6 +128,7 @@ pub fn handleAdd(
         .nativo = nativo,
         .zonaUbicacion = zona,
         .alturaActualCm = altura,
+        .fechaPlantado = fechaPlantado,
         .notas = notas,
     };
 
@@ -423,6 +430,7 @@ pub fn handleEdit(
     var newEspecie: ?[]const u8 = null;
     var newNombre: ?[]const u8 = null;
     var newTipo: ?TipoPlanta = null;
+    var newFechaPlantado: ?[]const u8 = null;
 
     // 3. Parsear opciones
     while (iter.next()) |arg| {
@@ -463,6 +471,11 @@ pub fn handleEdit(
                 return;
             };
             newTipo = if (std.mem.eql(u8, tipoStr, "arbol")) TipoPlanta.arbol else TipoPlanta.arbusto;
+        } else if (std.mem.eql(u8, arg, "--fecha-plantado")) {
+            newFechaPlantado = iter.next() orelse {
+                try stderr.print("Error: --fecha-plantado requiere un valor\n", .{});
+                return;
+            };
         } else {
             try stderr.print("Opción desconocida: {s}\n", .{arg});
         }
@@ -503,6 +516,7 @@ pub fn handleEdit(
     if (newNotas) |val| planta.notas = val;
     if (newNativo) |val| planta.nativo = val;
     if (newTipo) |val| planta.tipo = val;
+    if (newFechaPlantado) |val| planta.fechaPlantado = val;
 
     plantas.items[plantIndex] = planta;
 
