@@ -53,6 +53,11 @@ pub fn handleAdd(
         return;
     };
 
+    const tipo = std.meta.stringToEnum(TipoPlanta, tipoStr) orelse {
+        try stderr.print("Error: tipo inválido: '{s}'. Usa 'arbol' o 'arbusto'\n", .{tipoStr});
+        return;
+    };
+
     // 3. Variables para los campos opcionales
     var zona: []const u8 = "Sin zona especificada";
     var altura: ?u32 = null;
@@ -131,7 +136,7 @@ pub fn handleAdd(
 
     const planta = Planta{
         .id = id,
-        .tipo = if (std.mem.eql(u8, tipoStr, "arbol")) .arbol else .arbusto,
+        .tipo = tipo, 
         .nombreComun = nombre,
         .especie = especie,
         .nativo = nativo,
@@ -494,7 +499,11 @@ pub fn handleEdit(
                 try stderr.print("Error: --tipo requiere un valor.\n", .{});
                 return;
             };
-            newTipo = if (std.mem.eql(u8, tipoStr, "arbol")) TipoPlanta.arbol else TipoPlanta.arbusto;
+            newTipo = std.meta.stringToEnum(TipoPlanta, tipoStr) orelse {
+                try stderr.print("Tipo inválido: {s}, usa 'arbol' o 'arbusto'\n", .{tipoStr});
+                return;
+            };
+            // newTipo = if (std.mem.eql(u8, tipoStr, "arbol")) TipoPlanta.arbol else TipoPlanta.arbusto;
         } else if (std.mem.eql(u8, arg, "--fecha-plantado")) {
             newFechaPlantado = iter.next() orelse {
                 try stderr.print("Error: --fecha-plantado requiere un valor\n", .{});
@@ -530,10 +539,10 @@ pub fn handleEdit(
 
     // 4. Cargar plantas
     const path = "plants.json";
-    if (std.Io.Dir.cwd().access(io, path, .{})) {} else |_| {
+    std.Io.Dir.cwd().access(io, path, .{}) catch {
         try stderr.print("No hay plantas registradas.\n", .{});
         return;
-    }
+    };
 
     const contenido = try std.Io.Dir.cwd().readFileAlloc(io, path, allocator, .limited(1024 * 1024));
     defer allocator.free(contenido);
