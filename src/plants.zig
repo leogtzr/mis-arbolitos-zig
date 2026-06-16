@@ -219,7 +219,7 @@ pub fn handleList(
 
 fn printPlant(plant: *const Planta, stdout: *std.Io.Writer, showBitacora: bool) !void {
     try stdout.print("{s}\n", .{plant.nombreComun});
-    try stdout.print("    ID:     {s}\n", .{plant.id});
+    try stdout.print("    ID:      {s}\n", .{plant.id});
     try stdout.print("    Tipo:    {s}\n", .{@tagName(plant.tipo)});
     try stdout.print("    Zona:    {s}\n", .{plant.zonaUbicacion});
 
@@ -228,10 +228,10 @@ fn printPlant(plant: *const Planta, stdout: *std.Io.Writer, showBitacora: bool) 
     }
 
     if (plant.alturaActualCm) |h| {
-        try stdout.print("    Altura: {d} cm\n", .{h});
+        try stdout.print("    Altura:  {d} cm\n", .{h});
     }
 
-    try stdout.print("    Nativo: {s}\n", .{if (plant.nativo) "Sí" else "No"});
+    try stdout.print("    Nativo:  {s}\n", .{if (plant.nativo) "Sí" else "No"});
 
     if (plant.notas) |n| {
         try stdout.print("    Notas: {s}\n", .{n});
@@ -250,6 +250,13 @@ fn printPlant(plant: *const Planta, stdout: *std.Io.Writer, showBitacora: bool) 
             if (evento.notas) |n| {
                 try stdout.print("         Notas: {s}\n", .{n});
             }
+        }
+    }
+
+    if (plant.urlsDocumentacion.len > 0) {
+        try stdout.print("\n    --- URLs ---\n", .{});
+        for (plant.urlsDocumentacion, 0..) |url, i| {
+            try stdout.print("    [{d}] {s}\n", .{i + 1, url});
         }
     }
 }
