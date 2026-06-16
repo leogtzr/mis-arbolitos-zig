@@ -61,6 +61,9 @@ pub fn handleAdd(
     var especie: ?[]const u8 = null;
     var fechaPlantado: ?[]const u8 = null;
 
+    var urls: std.ArrayList([]const u8) = .empty;
+    defer urls.deinit(allocator);
+
     // 4. Parsear opciones (--zona, --altura, --nativo, etc.)
     while (iter.next()) |arg| {
         if (std.mem.eql(u8, arg, "--zona")) {
@@ -94,6 +97,12 @@ pub fn handleAdd(
                 try stderr.print("Error: --fecha-plantado requiere un valor.\n", .{});
                 return;
             };
+        } else if (std.mem.eql(u8, arg, "--url")) {
+            const url = iter.next() orelse {
+                try stderr.print("Error: url requiere un valor.\n", .{});
+                return;
+            };
+            try urls.append(allocator, url);
         } else {
             try stderr.print("Opción desconocida: {s}\n", .{arg});
         }
@@ -129,6 +138,7 @@ pub fn handleAdd(
         .zonaUbicacion = zona,
         .alturaActualCm = altura,
         .fechaPlantado = fechaPlantado,
+        .urlsDocumentacion = try urls.toOwnedSlice(allocator),
         .notas = notas,
     };
 
@@ -431,6 +441,13 @@ pub fn handleEdit(
     var newNombre: ?[]const u8 = null;
     var newTipo: ?TipoPlanta = null;
     var newFechaPlantado: ?[]const u8 = null;
+    var newUrls: std.ArrayList([]const u8) = .empty;
+    defer newUrls.deinit(allocator);
+    var urlsToAdd: std.ArrayList([]const u8) = .empty;
+    defer urlsToAdd.deinit(allocator);
+
+    var urlIndicesToRemove: std.ArrayList(usize) = .empty;
+    defer urlIndicesToRemove.deinit(allocator);
 
     // 3. Parsear opciones
     while (iter.next()) |arg| {
@@ -476,6 +493,29 @@ pub fn handleEdit(
                 try stderr.print("Error: --fecha-plantado requiere un valor\n", .{});
                 return;
             };
+        } else if (std.mem.eql(u8, arg, "--url")) {
+            const url = iter.next() orelse {
+                try stderr.print("Error: --url requiere un valor.\n", .{});
+                return;
+            };
+            try newUrls.append(allocator, url);
+        } else if (std.mem.eql(u8, arg, "--url-add")) {
+            const url = iter.next() orelse {
+                try stderr.print("Error: --url-add requiere un valor.\n", .{});
+                return;
+            };
+            try urlsToAdd.append(allocator, url);
+        } else if (std.mem.eql(u8, arg, "--url-remove-index")) {
+            const indexStr = iter.next() orelse {
+                try stderr.print("Error: --url-remove-index requiere un valor.\n", .{});
+                return;
+            };
+
+            const idx = std.fmt.parseInt(usize, indexStr, 10) catch {
+                try stderr.print("Error: --url-remove-index debe ser un número\n", .{});
+                return;
+            };
+            try urlIndicesToRemove.append(allocator, idx);
         } else {
             try stderr.print("Opción desconocida: {s}\n", .{arg});
         }
@@ -517,6 +557,39 @@ pub fn handleEdit(
     if (newNativo) |val| planta.nativo = val;
     if (newTipo) |val| planta.tipo = val;
     if (newFechaPlantado) |val| planta.fechaPlantado = val;
+    if (newUrls.items.len > 0) {
+        // if (planta.urlsDocumentacion.len > 0) {
+        //     allocator.free(planta.urlsDocumentacion);
+        // }
+        // planta.urlsDocumentacion = try newUrls.toOwnedSlice(allocator);
+        // --url reemplaza todo
+        planta.urlsDocumentacion = try newUrls.toOwnedSlice(allocator);
+    } else if (urlsToAdd.items.len > 0 or urlIndicesToRemove.items.len > 0) {
+        // Construir lista nueva a partir de la existente.
+        var lista: std.ArrayList([]const u8) = .empty;
+        defer lista.deinit(allocator);
+
+        for (planta.urlsDocumentacion, 0..) |url, i| {
+            // Saltar los índices marcados para eliminar:
+            var remover = false;
+            for (urlIndicesToRemove.items) |idx| {
+                if (idx == i) {
+                    remover = true;
+                    break;
+                }
+            }
+            if (!remover) {
+                try lista.append(allocator, url);
+            }
+        }
+
+        // Agregar las nuevas:
+        for (urlsToAdd.items) |url| {
+            try lista.append(allocator, url);
+        }
+
+        planta.urlsDocumentacion = try lista.toOwnedSlice(allocator);
+    }
 
     plantas.items[plantIndex] = planta;
 
@@ -530,4 +603,42 @@ pub fn handleEdit(
     try fw.interface.flush();
 
     try stdout.print("✅ Planta actualizada correctamente: {s}\n", .{plantId});
+}
+
+pub fn handleHelp(stdout: *std.Io.Writer) !void {
+    try stdout.print(
+        \\mis-arbolitos-zig - Gestor de árboles y arbustos
+        \\
+        \\USO:
+        \\    mis-arbolitos-zig <comando> [opciones]
+        \\
+        \\COMANDOS:
+        \\    add     Agregar una nueva planta
+        \\    list    Listar todas las plantas
+        \\    show    Mostrar detalles de una planta (incluye bitácora)
+        \\    edit    Modificar una planta existente
+        \\    log     Agregar un evento a la bitácora de una planta
+        \\    help    Mostrar esta ayuda
+        \\
+        \\EJEMPLOS:
+        \\    # Agregar una planta con URLs
+        \\    mis-arbolitos-zig add arbol "Olivo" --zona "Patio principal" \
+        \\        --url "https://es.wikipedia.org/wiki/Olea_europaea"
+        \\
+        \\    # Listar todas las plantas
+        \\    mis-arbolitos-zig list
+        \\
+        \\    # Ver detalles de una planta (incluye bitácora)
+        \\    mis-arbolitos-zig show planta-1749500000
+        \\
+        \\    # Actualizar zona y altura
+        \\    mis-arbolitos-zig edit planta-1749500000 --zona "Patio trasero" --altura 280
+        \\
+        \\    # Agregar evento de riego
+        \\    mis-arbolitos-zig log planta-1749500000 --tipo riego --cantidad 20 --notas "Agua normal"
+        \\
+        \\    # Ver ayuda
+        \\    mis-arbolitos-zig help
+        \\
+    , .{});
 }

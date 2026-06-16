@@ -29,7 +29,9 @@ pub fn main(init: std.process.Init) !void {
         return;
     };
 
-    if (std.mem.eql(u8, comando, "add")) {
+    if (std.mem.eql(u8, comando, "help") or std.mem.eql(u8, comando, "--help")) {
+        try plants.handleHelp(stdout);
+    } else if (std.mem.eql(u8, comando, "add")) {
         try plants.handleAdd(init.io, &iter, allocator, stdout, stderr);
     } else if (std.mem.eql(u8, comando, "list")) {
         try plants.handleList(init.io, allocator, stdout, stderr);
