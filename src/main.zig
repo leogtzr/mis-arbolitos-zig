@@ -33,6 +33,8 @@ pub fn main(init: std.process.Init) !void {
         try plants.handleHelp(stdout);
     } else if (std.mem.eql(u8, comando, "add")) {
         try plants.handleAdd(init.io, &iter, allocator, stdout, stderr);
+    } else if (std.mem.eql(u8, comando, "backup")) {
+        try plants.handleBackup(init.io, allocator, stdout, stderr);
     } else if (std.mem.eql(u8, comando, "list")) {
         try plants.handleList(init.io, allocator, stdout, stderr);
     } else if (std.mem.eql(u8, comando, "show")) {

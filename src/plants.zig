@@ -34,13 +34,7 @@ pub const Planta = struct {
     bitacora: []EventoCuidado = &.{},
 };
 
-pub fn handleAdd(
-    io: std.Io, 
-    iter: anytype, 
-    allocator: std.mem.Allocator, 
-    stdout: *std.Io.Writer, 
-    stderr: *std.Io.Writer
-    ) !void {
+pub fn handleAdd(io: std.Io, iter: anytype, allocator: std.mem.Allocator, stdout: *std.Io.Writer, stderr: *std.Io.Writer) !void {
     // 1. Obtener el tipo:
     const tipoStr = iter.next() orelse {
         try stderr.print("Error: falta el tipo (arbol|arbusto)\n", .{});
@@ -136,7 +130,7 @@ pub fn handleAdd(
 
     const planta = Planta{
         .id = id,
-        .tipo = tipo, 
+        .tipo = tipo,
         .nombreComun = nombre,
         .especie = especie,
         .nativo = nativo,
@@ -150,13 +144,7 @@ pub fn handleAdd(
     try guardarPlanta(planta, io, allocator, stdout, stderr);
 }
 
-fn guardarPlanta(
-    nuevaPlanta: Planta, 
-    io: std.Io, 
-    allocator: std.mem.Allocator, 
-    stdout: *std.Io.Writer, 
-    stderr: *std.Io.Writer
-    ) !void {
+fn guardarPlanta(nuevaPlanta: Planta, io: std.Io, allocator: std.mem.Allocator, stdout: *std.Io.Writer, stderr: *std.Io.Writer) !void {
     const path = "plants.json";
 
     // 1. Leer plantas existentes (si el archivo existe)
@@ -171,13 +159,14 @@ fn guardarPlanta(
     var parsed: ?std.json.Parsed([]Planta) = null;
     defer if (parsed) |*p| p.deinit();
 
-    if (std.Io.Dir.cwd().access(io, path, .{})) {
-        contenido = try std.Io.Dir.cwd().readFileAlloc(io, path, allocator, .limited(1024 * 1024));
-        parsed = try std.json.parseFromSlice([]Planta, allocator, contenido.?, .{});
-        try plantas.appendSlice(allocator, parsed.?.value);
-    } else |_| {
+    
+    std.Io.Dir.cwd().access(io, path, .{}) catch {
         try stderr.print("File does not exist ..., starting from scratch.\n", .{});
-    }
+        return;
+    };
+    contenido = try std.Io.Dir.cwd().readFileAlloc(io, path, allocator, .limited(1024 * 1024));
+    parsed = try std.json.parseFromSlice([]Planta, allocator, contenido.?, .{});
+    try plantas.appendSlice(allocator, parsed.?.value);
 
     // 2. Agregar la nueva planta
     try plantas.append(allocator, nuevaPlanta);
@@ -194,32 +183,27 @@ fn guardarPlanta(
     try stdout.print("Planta guardada exitosamente en {s}\n", .{path});
 }
 
-pub fn handleList(
-    io: std.Io, 
-    allocator: std.mem.Allocator, 
-    stdout: *std.Io.Writer, 
-    stderr: *std.Io.Writer
-    ) !void {
+pub fn handleList(io: std.Io, allocator: std.mem.Allocator, stdout: *std.Io.Writer, stderr: *std.Io.Writer) !void {
     const path = "plants.json";
-    if (std.Io.Dir.cwd().access(io, path, .{})) {
-        const contenido = try std.Io.Dir.cwd().readFileAlloc(io, path, allocator, .limited(1024 * 1024));
-        defer allocator.free(contenido);
-
-        const parsed = try std.json.parseFromSlice([]Planta, allocator, contenido, .{});
-        defer parsed.deinit();
-
-        const plantas = parsed.value;
-
-        if (plantas.len == 0) {
-            try stderr.print("No hay plantas o árboles registrados.\n", .{});
-            return;
-        }
-
-        try stdout.print("\n=== Lista de plantas ({d}) ===\n", .{plantas.len});
-        for (plantas) |plant| try printPlant(&plant, stdout, false); 
-    } else |_| {
+    std.Io.Dir.cwd().access(io, path, .{}) catch {
         try stderr.print("DB file might not be ready.", .{});
+        return;
+    };
+    const contenido = try std.Io.Dir.cwd().readFileAlloc(io, path, allocator, .limited(1024 * 1024));
+    defer allocator.free(contenido);
+
+    const parsed = try std.json.parseFromSlice([]Planta, allocator, contenido, .{});
+    defer parsed.deinit();
+
+    const plantas = parsed.value;
+
+    if (plantas.len == 0) {
+        try stderr.print("No hay plantas o árboles registrados.\n", .{});
+        return;
     }
+
+    try stdout.print("\n=== Lista de plantas ({d}) ===\n", .{plantas.len});
+    for (plantas) |plant| try printPlant(&plant, stdout, false);
 }
 
 fn printPlant(plant: *const Planta, stdout: *std.Io.Writer, showBitacora: bool) !void {
@@ -261,7 +245,7 @@ fn printPlant(plant: *const Planta, stdout: *std.Io.Writer, showBitacora: bool) 
     if (plant.urlsDocumentacion.len > 0) {
         try stdout.print("\n    --- URLs ---\n", .{});
         for (plant.urlsDocumentacion, 0..) |url, i| {
-            try stdout.print("    [{d}] {s}\n", .{i + 1, url});
+            try stdout.print("    [{d}] {s}\n", .{ i, url });
         }
     }
 }
@@ -273,39 +257,34 @@ fn findPlantById(plants: []const Planta, plantId: []const u8) ?*const Planta {
     return null;
 }
 
-pub fn handleShowPlantById(
-    io: std.Io, 
-    iter: anytype, 
-    allocator: std.mem.Allocator, 
-    stdout: *std.Io.Writer, 
-    stderr: *std.Io.Writer) !void {
+pub fn handleShowPlantById(io: std.Io, iter: anytype, allocator: std.mem.Allocator, stdout: *std.Io.Writer, stderr: *std.Io.Writer) !void {
     const plantIdStr = iter.next() orelse {
         try stderr.print("Error: el id de la planta|árbol a mostrar\n", .{});
         return;
     };
 
     const path = "plants.json";
-    if (std.Io.Dir.cwd().access(io, path, .{})) {
-        const contenido = try std.Io.Dir.cwd().readFileAlloc(io, path, allocator, .limited(1024 * 1024));
-        defer allocator.free(contenido);
-
-        const parsed = try std.json.parseFromSlice([]Planta, allocator, contenido, .{});
-        defer parsed.deinit();
-        const plantas = parsed.value;
-
-        if (findPlantById(plantas, plantIdStr)) |plant| {
-            try printPlant(plant, stdout, true);
-        } else {
-            try stderr.print("Planta no encontrada ... :(\n", .{});
-        }
-    } else |_| {
+    std.Io.Dir.cwd().access(io, path, .{}) catch {
         try stderr.print("DB file might not be ready.\n", .{});
+        return;
+    };
+    const contenido = try std.Io.Dir.cwd().readFileAlloc(io, path, allocator, .limited(1024 * 1024));
+    defer allocator.free(contenido);
+
+    const parsed = try std.json.parseFromSlice([]Planta, allocator, contenido, .{});
+    defer parsed.deinit();
+    const plantas = parsed.value;
+
+    if (findPlantById(plantas, plantIdStr)) |plant| {
+        try printPlant(plant, stdout, true);
+    } else {
+        try stderr.print("Planta no encontrada ... :(\n", .{});
     }
 }
 
 pub fn handleLog(
     io: std.Io,
-    iter: anytype, 
+    iter: anytype,
     allocator: std.mem.Allocator,
     stdout: *std.Io.Writer,
     stderr: *std.Io.Writer,
@@ -353,7 +332,7 @@ pub fn handleLog(
     }
 
     // 4. Convertir tipo_str a TipoEvento
-    const tipo =  std.meta.stringToEnum(TipoEvento, tipo_str) orelse {
+    const tipo = std.meta.stringToEnum(TipoEvento, tipo_str) orelse {
         try stderr.print("Error: tipo inválido '{s}'. Usa: riego, poda, fertilizante, plaga u otro\n", .{tipo_str});
         return;
     };
@@ -386,17 +365,17 @@ pub fn handleLog(
         try stderr.print("Planta con ID '{s}' no encontrada.\n", .{plant_id});
         return;
     };
-    
+
     // 7. Crear el nuevo evento:
     const now = std.Io.Clock.real.now(io);
     // const fecha = try std.fmt.allocPrint(allocator, "{d}-{d:0>2}-{d:0>2}", .{
     //     @divTrunc(now.nanoseconds, std.time.ns_per_day * 365) + 1970, // Año aproximado
     //     @mod(@divTrunc(@mod(now.nanoseconds, std.time.ns_per_day), std.time.ns_per_hour), 12) + 1, // Mes simplificado
     //     @mod(@divTrunc(@mod(now.nanoseconds, std.time.ns_per_day), std.time.ns_per_hour), 31) + 1, // Día simplificado
-    // }); 
+    // });
     //
     const timestamp_segundos = @divTrunc(now.nanoseconds, std.time.ns_per_s);
-    const fecha = try std.fmt.allocPrint(allocator, "{d}", .{ timestamp_segundos});
+    const fecha = try std.fmt.allocPrint(allocator, "{d}", .{timestamp_segundos});
     defer allocator.free(fecha);
 
     const evento = EventoCuidado{
@@ -433,7 +412,7 @@ pub fn handleLog(
 
 pub fn handleEdit(
     io: std.Io,
-    iter: anytype, 
+    iter: anytype,
     allocator: std.mem.Allocator,
     stdout: *std.Io.Writer,
     stderr: *std.Io.Writer,
@@ -552,7 +531,7 @@ pub fn handleEdit(
 
     var plantas: std.ArrayList(Planta) = .empty;
     defer plantas.deinit(allocator);
-    try plantas.appendSlice(allocator, parsed.value); 
+    try plantas.appendSlice(allocator, parsed.value);
 
     // 5. Buscar la planta
     const plantIndex = blk: {
@@ -574,11 +553,6 @@ pub fn handleEdit(
     if (newTipo) |val| planta.tipo = val;
     if (newFechaPlantado) |val| planta.fechaPlantado = val;
     if (newUrls.items.len > 0) {
-        // if (planta.urlsDocumentacion.len > 0) {
-        //     allocator.free(planta.urlsDocumentacion);
-        // }
-        // planta.urlsDocumentacion = try newUrls.toOwnedSlice(allocator);
-        // --url reemplaza todo
         planta.urlsDocumentacion = try newUrls.toOwnedSlice(allocator);
     } else if (urlsToAdd.items.len > 0 or urlIndicesToRemove.items.len > 0) {
         // Construir lista nueva a partir de la existente.
@@ -610,7 +584,7 @@ pub fn handleEdit(
     plantas.items[plantIndex] = planta;
 
     // Guardar cambios
-    const archivo = try std.Io.Dir.cwd().createFile(io, path, .{ .truncate = true});
+    const archivo = try std.Io.Dir.cwd().createFile(io, path, .{ .truncate = true });
     defer archivo.close(io);
 
     var buffer: [8192]u8 = undefined;
@@ -619,6 +593,45 @@ pub fn handleEdit(
     try fw.interface.flush();
 
     try stdout.print("✅ Planta actualizada correctamente: {s}\n", .{plantId});
+}
+
+pub fn handleBackup(
+    io: std.Io,
+    allocator: std.mem.Allocator, 
+    stdout: *std.Io.Writer,
+    stderr: *std.Io.Writer,
+) !void {
+    const sourcePath = "plants.json";
+
+    // Verificar que exista el archivo:
+    std.Io.Dir.cwd().access(io, sourcePath, .{}) catch {
+        try stderr.print("No existe el archivo plants.json para hacer el backup.\n", .{});
+        return;
+    };
+
+    // Date / handling...
+    const now = std.Io.Clock.real.now(io);
+    const timestamp = @divTrunc(now.nanoseconds, std.time.ns_per_s);
+    
+
+    // Format the name of the backup: plants.
+    const backupName = try std.fmt.allocPrint(
+        allocator,
+        "plants.json.{d}-{d:0>2}-{d:0>2}_{d:0>2}{d:0>2}{d:0>2}",
+        .{
+            @divTrunc(timestamp, 31536000) + 1970,           // Año aproximado
+            @mod(@divTrunc(timestamp, 2629746), 12) + 1,     // Mes
+            @mod(@divTrunc(timestamp, 86400), 31) + 1,       // Día
+            @mod(@divTrunc(timestamp, 3600), 24),            // Hora
+            @mod(@divTrunc(timestamp, 60), 60),              // Minutos
+            @mod(timestamp, 60),                             // Segundos
+        },
+    );
+
+    defer allocator.free(backupName);
+
+    try std.fs.cwd().copyFile(sourcePath, backupName, .{});
+    try stdout.print("✅ Backup creado exitosamente: {s}\n", .{backupName});
 }
 
 pub fn handleHelp(stdout: *std.Io.Writer) !void {
