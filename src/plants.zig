@@ -159,7 +159,6 @@ fn guardarPlanta(nuevaPlanta: Planta, io: std.Io, allocator: std.mem.Allocator, 
     var parsed: ?std.json.Parsed([]Planta) = null;
     defer if (parsed) |*p| p.deinit();
 
-    
     std.Io.Dir.cwd().access(io, path, .{}) catch {
         try stderr.print("File does not exist ..., starting from scratch.\n", .{});
         return;
@@ -597,7 +596,7 @@ pub fn handleEdit(
 
 pub fn handleBackup(
     io: std.Io,
-    allocator: std.mem.Allocator, 
+    allocator: std.mem.Allocator,
     stdout: *std.Io.Writer,
     stderr: *std.Io.Writer,
 ) !void {
@@ -612,25 +611,40 @@ pub fn handleBackup(
     // Date / handling...
     const now = std.Io.Clock.real.now(io);
     const timestamp = @divTrunc(now.nanoseconds, std.time.ns_per_s);
-    
+    const ts_u64: u64 = @intCast(timestamp);
+    const epochSeconds = std.time.epoch.EpochSeconds{ .secs = ts_u64 };
+    const epochDay = epochSeconds.getEpochDay();
+    const yearDay = epochDay.calculateYearDay();
+    const monthDay = yearDay.calculateMonthDay();
+    const daySeconds = epochSeconds.getDaySeconds();
 
-    // Format the name of the backup: plants.
+    const year = yearDay.year;
+    const month = monthDay.month.numeric();
+    const day = monthDay.day_index + 1;
+    const hour = daySeconds.getHoursIntoDay();
+    const minute = daySeconds.getMinutesIntoHour();
+    const second = daySeconds.getSecondsIntoMinute();
+
     const backupName = try std.fmt.allocPrint(
         allocator,
         "plants.json.{d}-{d:0>2}-{d:0>2}_{d:0>2}{d:0>2}{d:0>2}",
-        .{
-            @divTrunc(timestamp, 31536000) + 1970,           // Año aproximado
-            @mod(@divTrunc(timestamp, 2629746), 12) + 1,     // Mes
-            @mod(@divTrunc(timestamp, 86400), 31) + 1,       // Día
-            @mod(@divTrunc(timestamp, 3600), 24),            // Hora
-            @mod(@divTrunc(timestamp, 60), 60),              // Minutos
-            @mod(timestamp, 60),                             // Segundos
-        },
+        .{ year, month, day, hour, minute, second },
     );
 
     defer allocator.free(backupName);
 
-    try std.fs.cwd().copyFile(sourcePath, backupName, .{});
+    // try std.fs.cwd().copyFile(sourcePath, backupName, .{});
+    const contenido = try std.Io.Dir.cwd().readFileAlloc(io, sourcePath, allocator, .limited(10 * 1024 * 1024));
+    defer allocator.free(contenido);
+
+    const archivo = try std.Io.Dir.cwd().createFile(io, backupName, .{ .truncate = true });
+    defer archivo.close(io);
+
+    var buffer: [8192]u8 = undefined;
+    var fw = archivo.writer(io, &buffer);
+    try fw.interface.writeAll(contenido);
+    try fw.interface.flush();
+
     try stdout.print("✅ Backup creado exitosamente: {s}\n", .{backupName});
 }
 
