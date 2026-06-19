@@ -456,7 +456,18 @@ pub fn handleEdit(
                 return;
             };
         } else if (std.mem.eql(u8, arg, "--nativo")) {
-            newNativo = true;
+            const nativoStr = iter.next() orelse {
+                try stderr.print("Error: --nativo requiere un valor (true|false)\n", .{});
+                return;
+            };
+            if (std.mem.eql(u8, nativoStr, "true")) {
+                newNativo = true;
+            } else if (std.mem.eql(u8, nativoStr, "false")) {
+                newNativo = false;
+            } else {
+                try stderr.print("Error: --nativo debe ser 'true' o 'false'\n", .{});
+                return;
+            }
         } else if (std.mem.eql(u8, arg, "--notas")) {
             newNotas = iter.next() orelse {
                 try stderr.print("Error: --notas requiere un valor.\n", .{});
