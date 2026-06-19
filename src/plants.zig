@@ -80,7 +80,18 @@ pub fn handleAdd(io: std.Io, iter: anytype, allocator: std.mem.Allocator, stdout
                 return;
             };
         } else if (std.mem.eql(u8, arg, "--nativo")) {
-            nativo = true;
+            const nativoStr = iter.next() orelse {
+                try stderr.print("Error: --nativo requiere un valor (true|false)\n", .{});
+                return;
+            };
+            if (std.mem.eql(u8, nativoStr, "true")) {
+                nativo = true;
+            } else if (std.mem.eql(u8, nativoStr, "false")) {
+                nativo = false;
+            } else {
+                try stderr.print("Error: --nativo debe ser 'true' o 'false'\n", .{});
+                return;
+            }
         } else if (std.mem.eql(u8, arg, "--notas")) {
             notas = iter.next() orelse {
                 try stderr.print("Error: --notas requiere un valor\n", .{});
@@ -141,10 +152,10 @@ pub fn handleAdd(io: std.Io, iter: anytype, allocator: std.mem.Allocator, stdout
         .notas = notas,
     };
 
-    try guardarPlanta(planta, io, allocator, stdout, stderr);
+    try guardarPlanta(planta, io, allocator, stdout);
 }
 
-fn guardarPlanta(nuevaPlanta: Planta, io: std.Io, allocator: std.mem.Allocator, stdout: *std.Io.Writer, stderr: *std.Io.Writer) !void {
+fn guardarPlanta(nuevaPlanta: Planta, io: std.Io, allocator: std.mem.Allocator, stdout: *std.Io.Writer) !void {
     const path = "plants.json";
 
     // 1. Leer plantas existentes (si el archivo existe)
@@ -159,13 +170,12 @@ fn guardarPlanta(nuevaPlanta: Planta, io: std.Io, allocator: std.mem.Allocator, 
     var parsed: ?std.json.Parsed([]Planta) = null;
     defer if (parsed) |*p| p.deinit();
 
-    std.Io.Dir.cwd().access(io, path, .{}) catch {
-        try stderr.print("File does not exist ..., starting from scratch.\n", .{});
-        return;
-    };
-    contenido = try std.Io.Dir.cwd().readFileAlloc(io, path, allocator, .limited(1024 * 1024));
-    parsed = try std.json.parseFromSlice([]Planta, allocator, contenido.?, .{});
-    try plantas.appendSlice(allocator, parsed.?.value);
+    const archivoExiste = if (std.Io.Dir.cwd().access(io, path, .{})) true else |_| false;
+    if (archivoExiste) {
+        contenido = try std.Io.Dir.cwd().readFileAlloc(io, path, allocator, .limited(1024 * 1024));
+        parsed = try std.json.parseFromSlice([]Planta, allocator, contenido.?, .{});
+        try plantas.appendSlice(allocator, parsed.?.value);
+    }
 
     // 2. Agregar la nueva planta
     try plantas.append(allocator, nuevaPlanta);
@@ -176,7 +186,7 @@ fn guardarPlanta(nuevaPlanta: Planta, io: std.Io, allocator: std.mem.Allocator, 
 
     var buffer: [4096]u8 = undefined;
     var fw = archivo.writer(io, &buffer);
-    try std.json.Stringify.value(plantas.items, .{ .whitespace = .indent_2 }, &fw.interface);
+    try std.json.Stringify.value(plantas.items, .{ .whitespace = .indent_4 }, &fw.interface);
     try fw.interface.flush();
 
     try stdout.print("Planta guardada exitosamente en {s}\n", .{path});
@@ -403,7 +413,7 @@ pub fn handleLog(
 
     var buffer: [8192]u8 = undefined;
     var fw = archivo.writer(io, &buffer);
-    try std.json.Stringify.value(plantas.items, .{ .whitespace = .indent_2 }, &fw.interface);
+    try std.json.Stringify.value(plantas.items, .{ .whitespace = .indent_4 }, &fw.interface);
     try fw.interface.flush();
 
     try stdout.print("Evento agregado correctamente a la planta {s}\n", .{plant_id});
@@ -492,7 +502,6 @@ pub fn handleEdit(
                 try stderr.print("Tipo inválido: {s}, usa 'arbol' o 'arbusto'\n", .{tipoStr});
                 return;
             };
-            // newTipo = if (std.mem.eql(u8, tipoStr, "arbol")) TipoPlanta.arbol else TipoPlanta.arbusto;
         } else if (std.mem.eql(u8, arg, "--fecha-plantado")) {
             newFechaPlantado = iter.next() orelse {
                 try stderr.print("Error: --fecha-plantado requiere un valor\n", .{});
