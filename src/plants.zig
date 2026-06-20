@@ -3,6 +3,7 @@ const std = @import("std");
 pub const TipoPlanta = enum {
     arbol,
     arbusto,
+    cactacea,
 };
 
 pub const TipoEvento = enum {
@@ -37,7 +38,7 @@ pub const Planta = struct {
 pub fn handleAdd(io: std.Io, iter: anytype, allocator: std.mem.Allocator, stdout: *std.Io.Writer, stderr: *std.Io.Writer) !void {
     // 1. Obtener el tipo:
     const tipoStr = iter.next() orelse {
-        try stderr.print("Error: falta el tipo (arbol|arbusto)\n", .{});
+        try stderr.print("Error: falta el tipo (arbol|arbusto|cactacea)\n", .{});
         return;
     };
 
@@ -48,7 +49,7 @@ pub fn handleAdd(io: std.Io, iter: anytype, allocator: std.mem.Allocator, stdout
     };
 
     const tipo = std.meta.stringToEnum(TipoPlanta, tipoStr) orelse {
-        try stderr.print("Error: tipo inválido: '{s}'. Usa 'arbol' o 'arbusto'\n", .{tipoStr});
+        try stderr.print("Error: tipo inválido: '{s}'. Usa 'arbol', 'arbusto' o 'cactacea'\n", .{tipoStr});
         return;
     };
 
@@ -499,7 +500,7 @@ pub fn handleEdit(
                 return;
             };
             newTipo = std.meta.stringToEnum(TipoPlanta, tipoStr) orelse {
-                try stderr.print("Tipo inválido: {s}, usa 'arbol' o 'arbusto'\n", .{tipoStr});
+                try stderr.print("Tipo inválido: {s}, usa 'arbol', 'arbusto', 'cactacea'\n", .{tipoStr});
                 return;
             };
         } else if (std.mem.eql(u8, arg, "--fecha-plantado")) {
@@ -670,7 +671,7 @@ pub fn handleBackup(
 
 pub fn handleHelp(stdout: *std.Io.Writer) !void {
     try stdout.print(
-        \\mis-arbolitos-zig - Gestor de árboles y arbustos
+        \\mis-arbolitos-zig - Gestor de árboles y arbustos para mi granjita familiar
         \\
         \\USO:
         \\    mis-arbolitos-zig <comando> [opciones]
