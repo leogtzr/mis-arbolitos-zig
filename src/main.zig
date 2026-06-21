@@ -22,7 +22,7 @@ pub fn main(init: std.process.Init) !void {
     defer stderr.flush() catch {};
 
     var iter = init.minimal.args.iterate();
-    _ = iter.skip();            // Saltamos el nombre del ejecutable.
+    _ = iter.skip(); // Saltamos el nombre del ejecutable.
 
     const comando = iter.next() orelse {
         try stderr.print("Uso: mis-arbolitos-zig <comando> [opciones]\n", .{});
@@ -43,6 +43,10 @@ pub fn main(init: std.process.Init) !void {
         try plants.handleLog(init.io, &iter, allocator, stdout, stderr);
     } else if (std.mem.eql(u8, comando, "edit")) {
         try plants.handleEdit(init.io, &iter, allocator, stdout, stderr);
+    } else if (std.mem.eql(u8, comando, "delete")) {
+        try plants.handleDelete(init.io, &iter, allocator, stdout, stderr);
+    } else if (std.mem.eql(u8, comando, "search")) {
+        try plants.handleSearch(init.io, &iter, allocator, stdout, stderr);
     } else {
         try stderr.print("Comando desconocido: {s}\n", .{comando});
     }

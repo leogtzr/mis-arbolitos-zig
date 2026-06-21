@@ -10,12 +10,6 @@ pub fn build(b: *std.Build) void {
         .target = target,
     });
 
-    // const clap_dep = b.dependency("clap", .{
-    //     .target = target,
-    //     .optimize = optimize,
-    // });
-    // const clap_mod = clap_dep.module("clap");
-
     const exe = b.addExecutable(.{
         .name = "mis_arbolitos_zig",
         .root_module = b.createModule(.{
@@ -24,10 +18,14 @@ pub fn build(b: *std.Build) void {
             .optimize = optimize,
             .imports = &.{
                 .{ .name = "mis_arbolitos_zig", .module = mod },
-                // .{ .name = "clap", .module = clap_mod },
             },
         }),
     });
+    const regex = b.dependency("regex", .{
+        .target = target,
+        .optimize = optimize,
+    });
+    exe.root_module.addImport("regex", regex.module("regex"));
 
     b.installArtifact(exe);
 

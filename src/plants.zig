@@ -1,4 +1,5 @@
 const std = @import("std");
+const Regex = @import("regex").Regex;
 
 pub const TipoPlanta = enum {
     arbol,
@@ -154,6 +155,16 @@ pub fn handleAdd(io: std.Io, iter: anytype, allocator: std.mem.Allocator, stdout
     };
 
     try guardarPlanta(planta, io, allocator, stdout);
+}
+
+fn guardarPlantas(plantasFilePath: []const u8, plantas: std.ArrayList(Planta), io: std.Io) !void {
+    const archivo = try std.Io.Dir.cwd().createFile(io, plantasFilePath, .{ .truncate = true });
+    defer archivo.close(io);
+
+    var buffer: [4096]u8 = undefined;
+    var fw = archivo.writer(io, &buffer);
+    try std.json.Stringify.value(plantas.items, .{ .whitespace = .indent_4 }, &fw.interface);
+    try fw.interface.flush();
 }
 
 fn guardarPlanta(nuevaPlanta: Planta, io: std.Io, allocator: std.mem.Allocator, stdout: *std.Io.Writer) !void {
@@ -705,4 +716,100 @@ pub fn handleHelp(stdout: *std.Io.Writer) !void {
         \\    mis-arbolitos-zig help
         \\
     , .{});
+}
+
+pub fn handleDelete(io: std.Io, iter: anytype, allocator: std.mem.Allocator, stdout: *std.Io.Writer, stderr: *std.Io.Writer) !void {
+    const plantIdStr = iter.next() orelse {
+        try stderr.print("Error: el id de la planta|árbol a eliminar faltante\n", .{});
+        return;
+    };
+
+    const path = "plants.json";
+    std.Io.Dir.cwd().access(io, path, .{}) catch {
+        try stderr.print("DB file might not be ready.\n", .{});
+        return;
+    };
+    const contenido = try std.Io.Dir.cwd().readFileAlloc(io, path, allocator, .limited(1024 * 1024));
+    defer allocator.free(contenido);
+
+    const parsed = try std.json.parseFromSlice([]Planta, allocator, contenido, .{});
+    defer parsed.deinit();
+    const plantas = parsed.value;
+
+    // Check that plant exists ...
+    if (findPlantById(plantas, plantIdStr)) |_| {
+        // _ = planta;          <- another way of ignoring it.
+        // find the index to remove:
+        const targetId = plantIdStr;
+        var deleteIdx: ?usize = null;
+
+        for (plantas, 0..) |p, i| { // plant object its index...
+            if (std.mem.eql(u8, p.id, targetId)) {
+                deleteIdx = i;
+                break;
+            }
+        }
+
+        if (deleteIdx) |idx| {
+            // Copy to an ArrayList (we can mutate it)
+            var list: std.ArrayList(Planta) = .empty;
+            defer list.deinit(allocator);
+
+            try list.appendSlice(allocator, plantas);
+            _ = list.orderedRemove(idx);
+
+            try guardarPlantas(path, list, io);
+
+            try stdout.print("Planta con id '{s}' eliminada correctamente.\n", .{targetId});
+        } else {
+            try stderr.print("Error: no se encontró la planta con id '{s}'.\n", .{plantIdStr});
+        }
+    } else {
+        try stderr.print("Error: no existe una planta con id '{s}'.\n", .{plantIdStr});
+    }
+}
+
+pub fn handleSearch(io: std.Io, iter: *std.process.Args.Iterator, allocator: std.mem.Allocator, stdout: *std.Io.Writer, stderr: *std.Io.Writer) !void {
+    // 1. Obtener el tipo:
+    const seachOrRegexOption = iter.next() orelse {
+        try stdout.print("Error: search argument or --regex missing\n", .{});
+        return;
+    };
+
+    // try stdout.print("Search: [{s}]\n", .{seachOrRegexOption});
+
+    if (std.mem.eql(u8, seachOrRegexOption, "--regex")) {
+        const regexPattern = iter.next() orelse {
+            try stdout.print("Error: falta el tipo (arbol|arbusto|cactacea)\n", .{});
+            return;
+        };
+        // Use the regex
+        try stdout.print("Value to use for regex: [{s}]\n", .{regexPattern});
+        var regex = try Regex.compile(allocator, regexPattern);
+        defer regex.deinit();
+
+        const path = "plants.json";
+        std.Io.Dir.cwd().access(io, path, .{}) catch {
+            try stderr.print("DB file might not be ready.\n", .{});
+            return;
+        };
+        const contenido = try std.Io.Dir.cwd().readFileAlloc(io, path, allocator, .limited(1024 * 1024));
+        defer allocator.free(contenido);
+
+        const parsed = try std.json.parseFromSlice([]Planta, allocator, contenido, .{});
+        defer parsed.deinit();
+        const plantas = parsed.value;
+
+        for (plantas) |planta| {
+            if (try regex.find(planta.nombreComun)) |match| {
+                var m = match;
+                defer m.deinit(allocator);
+                // try stdout.print("Encontrado: {s} -> {s}\n", .{ match.slice, planta.nombreComun });
+                try printPlant(&planta, stdout, false);
+            }
+        }
+        return;
+    } else {
+        // Normal search ...
+    }
 }

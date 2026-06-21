@@ -32,10 +32,7 @@
     // Once all dependencies are fetched, `zig build` no longer requires
     // internet connectivity.
     .dependencies = .{
-        //.clap = .{
-        //    .url = "git+https://github.com/Hejsil/zig-clap?ref=master#bf56f229ed5b6c381d90e192234913c6deb3f688",
-        //    .hash = "clap-0.12.0-oBajB9noAQCFiI2syvjiZf6dENWUBFPWMEzdEPr99ZVx",
-        //},
+        .regex = .{ .url = "https://github.com/zig-utils/zig-regex/archive/main.tar.gz", .hash = "zig_regex-0.2.0-omky0be4FwDInJ-EsxxKbUqwI5xN4_XzsloHOLsLfn86" },
     },
     .paths = .{
         "build.zig",
