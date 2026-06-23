@@ -47,6 +47,8 @@ pub fn main(init: std.process.Init) !void {
         try plants.handleDelete(init.io, &iter, allocator, stdout, stderr);
     } else if (std.mem.eql(u8, comando, "search")) {
         try plants.handleSearch(init.io, &iter, allocator, stdout, stderr);
+    } else if (std.mem.eql(u8, comando, "info")) {
+        try plants.handleInfo(stdout);
     } else {
         try stderr.print("Comando desconocido: {s}\n", .{comando});
     }

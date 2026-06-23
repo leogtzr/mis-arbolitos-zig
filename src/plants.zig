@@ -769,6 +769,31 @@ pub fn handleDelete(io: std.Io, iter: anytype, allocator: std.mem.Allocator, std
     }
 }
 
+const PlantsResult = struct {
+    parsed: std.json.Parsed([]Planta),
+    contenido: []u8,
+
+    pub fn deinit(self: PlantsResult, allocator: std.mem.Allocator) void {
+        self.parsed.deinit();
+        allocator.free(self.contenido);
+    }
+
+    pub fn plants(self: PlantsResult) []Planta {
+        return self.parsed.value;
+    }
+};
+
+pub fn getPlantsFromFile(plantasFilePath: []const u8, allocator: std.mem.Allocator, io: std.Io, stderr: *std.Io.Writer) !PlantsResult {
+    std.Io.Dir.cwd().access(io, plantasFilePath, .{}) catch
+        try stderr.print("DB file might not be ready.\n", .{});
+
+    const contenido = try std.Io.Dir.cwd().readFileAlloc(io, plantasFilePath, allocator, .limited(1024 * 1024));
+    errdefer allocator.free(contenido);
+
+    const parsed = try std.json.parseFromSlice([]Planta, allocator, contenido, .{});
+    return .{ .parsed = parsed, .contenido = contenido };
+}
+
 pub fn handleSearch(io: std.Io, iter: *std.process.Args.Iterator, allocator: std.mem.Allocator, stdout: *std.Io.Writer, stderr: *std.Io.Writer) !void {
     // 1. Obtener el tipo:
     const seachOrRegexOption = iter.next() orelse {
@@ -776,40 +801,76 @@ pub fn handleSearch(io: std.Io, iter: *std.process.Args.Iterator, allocator: std
         return;
     };
 
-    // try stdout.print("Search: [{s}]\n", .{seachOrRegexOption});
-
     if (std.mem.eql(u8, seachOrRegexOption, "--regex")) {
         const regexPattern = iter.next() orelse {
             try stdout.print("Error: falta el tipo (arbol|arbusto|cactacea)\n", .{});
             return;
         };
         // Use the regex
-        try stdout.print("Value to use for regex: [{s}]\n", .{regexPattern});
+        // try stdout.print("Value to use for regex: [{s}]\n", .{regexPattern});
         var regex = try Regex.compile(allocator, regexPattern);
         defer regex.deinit();
 
-        const path = "plants.json";
-        std.Io.Dir.cwd().access(io, path, .{}) catch {
-            try stderr.print("DB file might not be ready.\n", .{});
-            return;
-        };
-        const contenido = try std.Io.Dir.cwd().readFileAlloc(io, path, allocator, .limited(1024 * 1024));
-        defer allocator.free(contenido);
-
-        const parsed = try std.json.parseFromSlice([]Planta, allocator, contenido, .{});
-        defer parsed.deinit();
-        const plantas = parsed.value;
+        const result = try getPlantsFromFile("plants.json", allocator, io, stderr);
+        defer result.deinit(allocator);
+        const plantas = result.plants();
 
         for (plantas) |planta| {
-            if (try regex.find(planta.nombreComun)) |match| {
-                var m = match;
-                defer m.deinit(allocator);
-                // try stdout.print("Encontrado: {s} -> {s}\n", .{ match.slice, planta.nombreComun });
+            if (try regex.isMatch(planta.nombreComun)) {
                 try printPlant(&planta, stdout, false);
             }
         }
         return;
     } else {
-        // Normal search ...
+        const whatToSearch = seachOrRegexOption;
+
+        const result = try getPlantsFromFile("plants.json", allocator, io, stderr);
+        defer result.deinit(allocator);
+        const plantas = result.plants();
+
+        for (plantas) |planta| {
+            var needleLower: [256]u8 = undefined;
+            var haystackLower: [256]u8 = undefined;
+            const needle = std.ascii.lowerString(&needleLower, whatToSearch);
+            const haystack = std.ascii.lowerString(&haystackLower, planta.nombreComun);
+            if (std.mem.indexOf(u8, haystack, needle) != null) {
+                try printPlant(&planta, stdout, false);
+            }
+        }
     }
+}
+
+pub fn handleInfo(stdout: *std.Io.Writer) !void {
+    try stdout.print(
+        \\
+        \\                                    (norte)
+        \\         ╔═══════════════════════════════════════════════════════════╗
+        \\         ║                  ║   ║    ║   ║                 ║         ║
+        \\         ║                  ║   ║    ║   ║                 ║         ║
+        \\         ║                  ╚════════════╝         C       ╚═════════║
+        \\         ║                                       C     C             ║
+        \\         ║                                     C         C           ║
+        \\         ║                                    C            C         ║
+        \\         ║                                      C            C       ║
+        \\         ║                                        C        C         ║
+        \\         ║                                          C   C            ║
+        \\         ║══════════════╗                            C               ║
+        \\         ║              ║                                AAAAAA      ║
+        \\         ║              ║                                A    A      ║
+        \\ I (Oeste)              ║                                A    A      ║ D (Este)
+        \\         ║              ║                                A    A      ║
+        \\         ║              ║                                AAAAAA      ║
+        \\         ║══════════════╝                                            ║
+        \\         ║                                                           ║
+        \\         ║                                                           ║
+        \\         ║                                                           ║
+        \\         ║                                                           ║
+        \\         ║   N                                                 N     ║
+        \\         ║   N                               ╔═╗               N     ║
+        \\         ║   N                               ╚═╝               N     ║
+        \\         ║                                                           ║
+        \\         ╚═══════════════════════════Portón══════════════════════════╝
+        \\                                     (sur)
+        \\
+    , .{});
 }
