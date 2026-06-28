@@ -401,12 +401,6 @@ pub fn handleLog(
 
     // 7. Crear el nuevo evento:
     const now = std.Io.Clock.real.now(io);
-    // const fecha = try std.fmt.allocPrint(allocator, "{d}-{d:0>2}-{d:0>2}", .{
-    //     @divTrunc(now.nanoseconds, std.time.ns_per_day * 365) + 1970, // Año aproximado
-    //     @mod(@divTrunc(@mod(now.nanoseconds, std.time.ns_per_day), std.time.ns_per_hour), 12) + 1, // Mes simplificado
-    //     @mod(@divTrunc(@mod(now.nanoseconds, std.time.ns_per_day), std.time.ns_per_hour), 31) + 1, // Día simplificado
-    // });
-    //
     const timestamp_segundos = @divTrunc(now.nanoseconds, std.time.ns_per_s);
     const fecha = try std.fmt.allocPrint(allocator, "{d}", .{timestamp_segundos});
     defer allocator.free(fecha);
@@ -693,38 +687,99 @@ pub fn handleBackup(
 
 pub fn handleHelp(stdout: *std.Io.Writer) !void {
     try stdout.print(
-        \\mis-arbolitos-zig - Gestor de árboles y arbustos para mi granjita familiar
+        \\mis-arbolitos-zig - Gestor de árboles y plantas para mi granjita familiar
         \\
         \\USO:
         \\    mis-arbolitos-zig <comando> [opciones]
         \\
         \\COMANDOS:
-        \\    add     Agregar una nueva planta
-        \\    list    Listar todas las plantas
-        \\    show    Mostrar detalles de una planta (incluye bitácora)
-        \\    edit    Modificar una planta existente
-        \\    log     Agregar un evento a la bitácora de una planta
-        \\    help    Mostrar esta ayuda
+        \\    add      Agregar una nueva planta
+        \\    list     Listar todas las plantas
+        \\    show     Mostrar detalles de una planta (incluye bitácora)
+        \\    edit     Modificar una planta existente
+        \\    log      Agregar un evento a la bitácora de una planta
+        \\    delete   Eliminar una planta
+        \\    search   Buscar plantas por nombre
+        \\    backup   Crear respaldo del archivo plants.json
+        \\    info     Mostrar mapa de la granjita
+        \\    help     Mostrar esta ayuda
+        \\
+        \\ADD  mis-arbolitos-zig add <tipo> <nombre> [opciones]
+        \\    <tipo>                arbol | arbusto | cactacea
+        \\    <nombre>              Nombre común de la planta (obligatorio)
+        \\    --zona <zona>         Zona o ubicación dentro de la granjita
+        \\    --especie <nombre>    Nombre científico
+        \\    --altura <cm>         Altura actual en centímetros
+        \\    --nativo true|false   Si es una especie nativa
+        \\    --fecha-plantado <f>  Fecha en que se plantó (ej. 2024-03-15)
+        \\    --estado <estado>     sana | enferma | recuperacion | muerta
+        \\    --notas <texto>       Notas adicionales
+        \\    --url <url>           URL de documentación (repetible)
+        \\
+        \\EDIT  mis-arbolitos-zig edit <id> [opciones]
+        \\    <id>                        ID de la planta a modificar
+        \\    --nombre <nombre>           Nuevo nombre común
+        \\    --tipo <tipo>               arbol | arbusto | cactacea
+        \\    --zona <zona>               Nueva zona o ubicación
+        \\    --especie <nombre>          Nuevo nombre científico
+        \\    --altura <cm>               Nueva altura en centímetros
+        \\    --nativo true|false         Actualizar si es nativa
+        \\    --fecha-plantado <f>        Nueva fecha de plantado
+        \\    --estado <estado>           sana | enferma | recuperacion | muerta
+        \\    --notas <texto>             Nuevas notas
+        \\    --url <url>                 Reemplaza toda la lista de URLs (repetible)
+        \\    --url-add <url>             Agrega una URL a la lista existente (repetible)
+        \\    --url-remove-index <n>      Elimina la URL en el índice n (repetible)
+        \\
+        \\LOG  mis-arbolitos-zig log <id> --tipo <tipo> [opciones]
+        \\    <id>               ID de la planta
+        \\    --tipo <tipo>      riego | poda | fertilizante | plaga | otro (obligatorio)
+        \\    --cantidad <l>     Cantidad de agua en litros (para riego)
+        \\    --notas <texto>    Notas del evento
+        \\
+        \\SEARCH  mis-arbolitos-zig search <término>
+        \\        mis-arbolitos-zig search --regex <patrón>
+        \\    Busca en el nombre común. Sin --regex la búsqueda es insensible a mayúsculas.
         \\
         \\EJEMPLOS:
-        \\    # Agregar una planta con URLs
+        \\    # Agregar un olivo con especie, zona y URL
         \\    mis-arbolitos-zig add arbol "Olivo" --zona "Patio principal" \
-        \\        --url "https://es.wikipedia.org/wiki/Olea_europaea"
+        \\        --especie "Olea europaea" --url "https://es.wikipedia.org/wiki/Olea_europaea"
+        \\
+        \\    # Agregar un nopal marcándolo como nativo
+        \\    mis-arbolitos-zig add cactacea "Nopal" --zona "Cerca norte" --nativo true
         \\
         \\    # Listar todas las plantas
         \\    mis-arbolitos-zig list
         \\
-        \\    # Ver detalles de una planta (incluye bitácora)
+        \\    # Ver detalles de una planta (incluye bitácora y URLs)
         \\    mis-arbolitos-zig show planta-1749500000
         \\
-        \\    # Actualizar zona y altura
-        \\    mis-arbolitos-zig edit planta-1749500000 --zona "Patio trasero" --altura 280
+        \\    # Actualizar zona, altura y estado de salud
+        \\    mis-arbolitos-zig edit planta-1749500000 --zona "Patio trasero" \
+        \\        --altura 280 --estado recuperacion
+        \\
+        \\    # Agregar URL a una planta sin borrar las existentes
+        \\    mis-arbolitos-zig edit planta-1749500000 --url-add "https://ejemplo.com"
         \\
         \\    # Agregar evento de riego
-        \\    mis-arbolitos-zig log planta-1749500000 --tipo riego --cantidad 20 --notas "Agua normal"
+        \\    mis-arbolitos-zig log planta-1749500000 --tipo riego --cantidad 20 \
+        \\        --notas "Agua de lluvia"
         \\
-        \\    # Ver ayuda
-        \\    mis-arbolitos-zig help
+        \\    # Buscar por nombre (insensible a mayúsculas)
+        \\    mis-arbolitos-zig search fresno
+        \\
+        \\    # Buscar con expresión regular
+        \\    mis-arbolitos-zig search --regex "^[Nn]o"
+        \\
+        \\    # Eliminar una planta
+        \\    mis-arbolitos-zig delete planta-1749500000
+        \\
+        \\    # Crear respaldo
+        \\    mis-arbolitos-zig backup
+        \\
+        \\    # Ver mapa de la granjita
+        \\    mis-arbolitos-zig info
         \\
     , .{});
 }
