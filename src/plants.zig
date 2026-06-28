@@ -747,34 +747,25 @@ pub fn handleDelete(io: std.Io, iter: anytype, allocator: std.mem.Allocator, std
     defer parsed.deinit();
     const plantas = parsed.value;
 
-    // Check that plant exists ...
-    if (findPlantById(plantas, plantIdStr)) |_| {
-        // _ = planta;          <- another way of ignoring it.
-        // find the index to remove:
-        const targetId = plantIdStr;
-        var deleteIdx: ?usize = null;
-
-        for (plantas, 0..) |p, i| { // plant object its index...
-            if (std.mem.eql(u8, p.id, targetId)) {
-                deleteIdx = i;
-                break;
-            }
+    var deleteIdx: ?usize = null;
+    for (plantas, 0..) |plantita, i| {
+        if (std.mem.eql(u8, plantita.id, plantIdStr)) {
+            deleteIdx = i;
+            break;
         }
+    }
 
-        if (deleteIdx) |idx| {
-            // Copy to an ArrayList (we can mutate it)
-            var list: std.ArrayList(Planta) = .empty;
-            defer list.deinit(allocator);
+    if (deleteIdx) |idx| {
+        // Copy to an ArrayList (we can mutate it)
+        var list: std.ArrayList(Planta) = .empty;
+        defer list.deinit(allocator);
 
-            try list.appendSlice(allocator, plantas);
-            _ = list.orderedRemove(idx);
+        try list.appendSlice(allocator, plantas);
+        _ = list.orderedRemove(idx);
 
-            try guardarPlantas(path, list, io);
+        try guardarPlantas(path, list, io);
 
-            try stdout.print("Planta con id '{s}' eliminada correctamente.\n", .{targetId});
-        } else {
-            try stderr.print("Error: no se encontró la planta con id '{s}'.\n", .{plantIdStr});
-        }
+        try stdout.print("Planta con id '{s}' eliminada correctamente.\n", .{plantIdStr});
     } else {
         try stderr.print("Error: no existe una planta con id '{s}'.\n", .{plantIdStr});
     }
