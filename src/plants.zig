@@ -15,6 +15,8 @@ pub const TipoEvento = enum {
     otro,
 };
 
+pub const EstadoSalud = enum { sana, enferma, recuperacion, muerta };
+
 pub const EventoCuidado = struct {
     fecha: []const u8, // Por ahora usamos string "2025-06-06"
     tipo: TipoEvento,
@@ -34,6 +36,7 @@ pub const Planta = struct {
     notas: ?[]const u8 = null,
     urlsDocumentacion: []const []const u8 = &.{},
     bitacora: []EventoCuidado = &.{},
+    estado: ?EstadoSalud = null,
 };
 
 pub fn handleAdd(io: std.Io, iter: anytype, allocator: std.mem.Allocator, stdout: *std.Io.Writer, stderr: *std.Io.Writer) !void {
@@ -61,11 +64,12 @@ pub fn handleAdd(io: std.Io, iter: anytype, allocator: std.mem.Allocator, stdout
     var notas: ?[]const u8 = null;
     var especie: ?[]const u8 = null;
     var fechaPlantado: ?[]const u8 = null;
+    var estado: ?EstadoSalud = null;
 
     var urls: std.ArrayList([]const u8) = .empty;
     defer urls.deinit(allocator);
 
-    // 4. Parsear opciones (--zona, --altura, --nativo, etc.)
+    // 4. Parsear opciones (--zona, --altura, --nativo, --estado, etc.)
     while (iter.next()) |arg| {
         if (std.mem.eql(u8, arg, "--zona")) {
             zona = iter.next() orelse {
@@ -104,6 +108,15 @@ pub fn handleAdd(io: std.Io, iter: anytype, allocator: std.mem.Allocator, stdout
                 try stderr.print("Error: --especie requiere un valor\n", .{});
                 return;
             };
+        } else if (std.mem.eql(u8, arg, "--estado")) {
+            const estadoSaludStr = iter.next() orelse {
+                try stderr.print("Error: --estado requiere un valor\n", .{});
+                return;
+            };
+            estado = std.meta.stringToEnum(EstadoSalud, estadoSaludStr) orelse {
+                try stderr.print("Error: estado inválido '{s}'. Usa: sana, enferma, recuperacion o muerta \n", .{estadoSaludStr});
+                return;
+            };
         } else if (std.mem.eql(u8, arg, "--fecha-plantado")) {
             fechaPlantado = iter.next() orelse {
                 try stderr.print("Error: --fecha-plantado requiere un valor.\n", .{});
@@ -127,6 +140,7 @@ pub fn handleAdd(io: std.Io, iter: anytype, allocator: std.mem.Allocator, stdout
     try stdout.print("Zona: {s}\n", .{zona});
     try stdout.print("Altura: {?}\n", .{altura});
     try stdout.print("Nativo: {}\n", .{nativo});
+    try stdout.print("Estado: {any}\n", .{estado});
 
     if (especie) |e| {
         try stdout.print("Especie: {s}\n", .{e});
@@ -152,6 +166,7 @@ pub fn handleAdd(io: std.Io, iter: anytype, allocator: std.mem.Allocator, stdout
         .fechaPlantado = fechaPlantado,
         .urlsDocumentacion = try urls.toOwnedSlice(allocator),
         .notas = notas,
+        .estado = estado,
     };
 
     try guardarPlanta(planta, io, allocator, stdout);
@@ -242,6 +257,10 @@ fn printPlant(plant: *const Planta, stdout: *std.Io.Writer, showBitacora: bool) 
     }
 
     try stdout.print("    Nativo:  {s}\n", .{if (plant.nativo) "Sí" else "No"});
+
+    if (plant.estado) |estado| {
+        try stdout.print(".   Estado:  {s}\n", .{@tagName(estado)});
+    }
 
     if (plant.notas) |n| {
         try stdout.print("    Notas: {s}\n", .{n});
@@ -456,6 +475,7 @@ pub fn handleEdit(
     var newUrls: std.ArrayList([]const u8) = .empty;
     defer newUrls.deinit(allocator);
     var urlsToAdd: std.ArrayList([]const u8) = .empty;
+    var estadoSalud: ?EstadoSalud = null;
     defer urlsToAdd.deinit(allocator);
 
     var urlIndicesToRemove: std.ArrayList(usize) = .empty;
@@ -512,6 +532,15 @@ pub fn handleEdit(
             };
             newTipo = std.meta.stringToEnum(TipoPlanta, tipoStr) orelse {
                 try stderr.print("Tipo inválido: {s}, usa 'arbol', 'arbusto', 'cactacea'\n", .{tipoStr});
+                return;
+            };
+        } else if (std.mem.eql(u8, arg, "--estado")) {
+            const estadoSaludStr = iter.next() orelse {
+                try stderr.print("Error: --estado requiere un valor\n", .{});
+                return;
+            };
+            estadoSalud = std.meta.stringToEnum(EstadoSalud, estadoSaludStr) orelse {
+                try stderr.print("Error: estado inválido '{s}'. Usa: sana, enferma, recuperacion o muerta \n", .{estadoSaludStr});
                 return;
             };
         } else if (std.mem.eql(u8, arg, "--fecha-plantado")) {
@@ -583,6 +612,7 @@ pub fn handleEdit(
     if (newNativo) |val| planta.nativo = val;
     if (newTipo) |val| planta.tipo = val;
     if (newFechaPlantado) |val| planta.fechaPlantado = val;
+    if (estadoSalud) |val| planta.estado = val;
     if (newUrls.items.len > 0) {
         planta.urlsDocumentacion = try newUrls.toOwnedSlice(allocator);
     } else if (urlsToAdd.items.len > 0 or urlIndicesToRemove.items.len > 0) {
@@ -784,8 +814,10 @@ const PlantsResult = struct {
 };
 
 pub fn getPlantsFromFile(plantasFilePath: []const u8, allocator: std.mem.Allocator, io: std.Io, stderr: *std.Io.Writer) !PlantsResult {
-    std.Io.Dir.cwd().access(io, plantasFilePath, .{}) catch
+    std.Io.Dir.cwd().access(io, plantasFilePath, .{}) catch |err| {
         try stderr.print("DB file might not be ready.\n", .{});
+        return err;
+    };
 
     const contenido = try std.Io.Dir.cwd().readFileAlloc(io, plantasFilePath, allocator, .limited(1024 * 1024));
     errdefer allocator.free(contenido);
