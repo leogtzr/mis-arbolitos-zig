@@ -208,14 +208,7 @@ fn guardarPlanta(nuevaPlanta: Planta, io: std.Io, allocator: std.mem.Allocator, 
     try plantas.append(allocator, nuevaPlanta);
 
     // 3. Convertir a JSON y guardar
-    const archivo = try std.Io.Dir.cwd().createFile(io, path, .{ .truncate = true });
-    defer archivo.close(io);
-
-    var buffer: [4096]u8 = undefined;
-    var fw = archivo.writer(io, &buffer);
-    try std.json.Stringify.value(plantas.items, .{ .whitespace = .indent_4 }, &fw.interface);
-    try fw.interface.flush();
-
+    try guardarPlantas(path, plantas, io);
     try stdout.print("Planta guardada exitosamente en {s}\n", .{path});
 }
 
@@ -439,13 +432,7 @@ pub fn handleLog(
     plantas.items[plantIndex] = planta;
 
     // 9. Guardar todo
-    const archivo = try std.Io.Dir.cwd().createFile(io, path, .{ .truncate = true });
-    defer archivo.close(io);
-
-    var buffer: [8192]u8 = undefined;
-    var fw = archivo.writer(io, &buffer);
-    try std.json.Stringify.value(plantas.items, .{ .whitespace = .indent_4 }, &fw.interface);
-    try fw.interface.flush();
+    try guardarPlantas(path, plantas, io);
 
     try stdout.print("Evento agregado correctamente a la planta {s}\n", .{plant_id});
 }
@@ -645,13 +632,7 @@ pub fn handleEdit(
     plantas.items[plantIndex] = planta;
 
     // Guardar cambios
-    const archivo = try std.Io.Dir.cwd().createFile(io, path, .{ .truncate = true });
-    defer archivo.close(io);
-
-    var buffer: [8192]u8 = undefined;
-    var fw = archivo.writer(io, &buffer);
-    try std.json.Stringify.value(plantas.items, .{ .whitespace = .indent_4 }, &fw.interface);
-    try fw.interface.flush();
+    try guardarPlantas(path, plantas, io);
 
     try stdout.print("✅ Planta actualizada correctamente: {s}\n", .{plantId});
 }
