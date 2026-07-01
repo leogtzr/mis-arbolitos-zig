@@ -140,7 +140,7 @@ pub fn handleAdd(io: std.Io, iter: anytype, allocator: std.mem.Allocator, stdout
     try stdout.print("Zona: {s}\n", .{zona});
     try stdout.print("Altura: {?}\n", .{altura});
     try stdout.print("Nativo: {}\n", .{nativo});
-    try stdout.print("Estado: {any}\n", .{estado});
+    try stdout.print("Estado: {?}\n", .{estado});
 
     if (especie) |e| {
         try stdout.print("Especie: {s}\n", .{e});
@@ -252,7 +252,7 @@ fn printPlant(plant: *const Planta, stdout: *std.Io.Writer, showBitacora: bool) 
     try stdout.print("    Nativo:  {s}\n", .{if (plant.nativo) "Sí" else "No"});
 
     if (plant.estado) |estado| {
-        try stdout.print(".   Estado:  {s}\n", .{@tagName(estado)});
+        try stdout.print("    Estado:  {s}\n", .{@tagName(estado)});
     }
 
     if (plant.notas) |n| {
@@ -856,13 +856,13 @@ pub fn getPlantsFromFile(plantasFilePath: []const u8, allocator: std.mem.Allocat
 pub fn handleSearch(io: std.Io, iter: *std.process.Args.Iterator, allocator: std.mem.Allocator, stdout: *std.Io.Writer, stderr: *std.Io.Writer) !void {
     // 1. Obtener el tipo:
     const seachOrRegexOption = iter.next() orelse {
-        try stdout.print("Error: search argument or --regex missing\n", .{});
+        try stderr.print("Error: search argument or --regex missing\n", .{});
         return;
     };
 
     if (std.mem.eql(u8, seachOrRegexOption, "--regex")) {
         const regexPattern = iter.next() orelse {
-            try stdout.print("Error: falta el tipo (arbol|arbusto|cactacea)\n", .{});
+            try stderr.print("Error: falta el tipo (arbol|arbusto|cactacea)\n", .{});
             return;
         };
         // Use the regex
