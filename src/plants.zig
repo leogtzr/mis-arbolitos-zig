@@ -139,7 +139,9 @@ pub fn handleAdd(io: std.Io, iter: anytype, allocator: std.mem.Allocator, stdout
     try stdout.print("Zona: {s}\n", .{zona});
     try stdout.print("Altura: {?}\n", .{altura});
     try stdout.print("Nativo: {}\n", .{nativo});
-    try stdout.print("Estado: {?}\n", .{estado});
+    if (estado) |e| {
+        try stdout.print("Estado: {s}\n", .{@tagName(e)});
+    }
 
     if (especie) |e| {
         try stdout.print("Especie: {s}\n", .{e});
@@ -217,7 +219,7 @@ pub fn handleList(io: std.Io, allocator: std.mem.Allocator, stdout: *std.Io.Writ
     const plantsResults = try getPlantsFromFile(path, allocator, io, stderr);
     defer plantsResults.deinit(allocator);
 
-    const plantas = plantsResults.parsed.value;
+    const plantas = plantsResults.plants();
 
     if (plantas.len == 0) {
         try stderr.print("No hay plantas o árboles registrados.\n", .{});
@@ -295,7 +297,7 @@ pub fn handleShowPlantById(io: std.Io, iter: anytype, allocator: std.mem.Allocat
     const plantsFromFile = try getPlantsFromFile(path, allocator, io, stderr);
     defer plantsFromFile.deinit(allocator);
 
-    const plantas = plantsFromFile.parsed.value;
+    const plantas = plantsFromFile.plants();
 
     if (findPlantById(plantas, plantIdStr)) |plant| {
         try printPlant(plant, stdout, true);
@@ -853,8 +855,8 @@ pub fn handleSearch(io: std.Io, iter: *std.process.Args.Iterator, allocator: std
         const plantas = result.plants();
 
         for (plantas) |planta| {
-            var needleLower: [256]u8 = undefined;
-            var haystackLower: [256]u8 = undefined;
+            var needleLower: [512]u8 = undefined;
+            var haystackLower: [512]u8 = undefined;
             const needle = std.ascii.lowerString(&needleLower, whatToSearch);
             const haystack = std.ascii.lowerString(&haystackLower, planta.nombreComun);
             if (std.mem.indexOf(u8, haystack, needle) != null) {
