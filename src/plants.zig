@@ -133,7 +133,6 @@ pub fn handleAdd(io: std.Io, iter: anytype, allocator: std.mem.Allocator, stdout
         }
     }
 
-    // 5. Crear la planta (por ahora solo la imprimimos)
     try stdout.print("=== Nueva Planta ===\n", .{});
     try stdout.print("Tipo: {s}\n", .{tipoStr});
     try stdout.print("Nombre: {s}\n", .{nombre});
@@ -214,22 +213,18 @@ fn guardarPlanta(nuevaPlanta: Planta, io: std.Io, allocator: std.mem.Allocator, 
 
 pub fn handleList(io: std.Io, allocator: std.mem.Allocator, stdout: *std.Io.Writer, stderr: *std.Io.Writer) !void {
     const path = "plants.json";
-    std.Io.Dir.cwd().access(io, path, .{}) catch {
-        try stderr.print("DB file might not be ready.", .{});
-        return;
-    };
-    const contenido = try std.Io.Dir.cwd().readFileAlloc(io, path, allocator, .limited(1024 * 1024));
-    defer allocator.free(contenido);
 
-    const parsed = try std.json.parseFromSlice([]Planta, allocator, contenido, .{});
-    defer parsed.deinit();
+    const plantsResults = try getPlantsFromFile(path, allocator, io, stderr);
+    defer plantsResults.deinit(allocator);
 
-    const plantas = parsed.value;
+    const plantas = plantsResults.parsed.value;
 
     if (plantas.len == 0) {
         try stderr.print("No hay plantas o árboles registrados.\n", .{});
         return;
     }
+
+    // TODO: add some filters ...
 
     try stdout.print("\n=== Lista de plantas ({d}) ===\n", .{plantas.len});
     for (plantas) |plant| try printPlant(&plant, stdout, false);
@@ -297,16 +292,10 @@ pub fn handleShowPlantById(io: std.Io, iter: anytype, allocator: std.mem.Allocat
     };
 
     const path = "plants.json";
-    std.Io.Dir.cwd().access(io, path, .{}) catch {
-        try stderr.print("DB file might not be ready.\n", .{});
-        return;
-    };
-    const contenido = try std.Io.Dir.cwd().readFileAlloc(io, path, allocator, .limited(1024 * 1024));
-    defer allocator.free(contenido);
+    const plantsFromFile = try getPlantsFromFile(path, allocator, io, stderr);
+    defer plantsFromFile.deinit(allocator);
 
-    const parsed = try std.json.parseFromSlice([]Planta, allocator, contenido, .{});
-    defer parsed.deinit();
-    const plantas = parsed.value;
+    const plantas = plantsFromFile.parsed.value;
 
     if (findPlantById(plantas, plantIdStr)) |plant| {
         try printPlant(plant, stdout, true);
@@ -372,21 +361,13 @@ pub fn handleLog(
 
     // 5. Cargar plantas
     const path = "plants.json";
-    std.Io.Dir.cwd().access(io, path, .{}) catch {
-        try stderr.print("No hay plantas registradas.\n", .{});
-        return;
-    };
-
-    const contenido = try std.Io.Dir.cwd().readFileAlloc(io, path, allocator, .limited(1024 * 1024));
-    defer allocator.free(contenido);
-
-    const parsed = try std.json.parseFromSlice([]Planta, allocator, contenido, .{});
-    defer parsed.deinit();
+    const plantsFromFile = try getPlantsFromFile(path, allocator, io, stderr);
+    defer plantsFromFile.deinit(allocator);
 
     var plantas: std.ArrayList(Planta) = .empty;
     defer plantas.deinit(allocator);
 
-    try plantas.appendSlice(allocator, parsed.value);
+    try plantas.appendSlice(allocator, plantsFromFile.parsed.value);
 
     // 6. Buscar la planta
     const plantIndex = blk: {
@@ -456,8 +437,8 @@ pub fn handleEdit(
     var newUrls: std.ArrayList([]const u8) = .empty;
     defer newUrls.deinit(allocator);
     var urlsToAdd: std.ArrayList([]const u8) = .empty;
-    var estadoSalud: ?EstadoSalud = null;
     defer urlsToAdd.deinit(allocator);
+    var estadoSalud: ?EstadoSalud = null;
 
     var urlIndicesToRemove: std.ArrayList(usize) = .empty;
     defer urlIndicesToRemove.deinit(allocator);
@@ -559,20 +540,12 @@ pub fn handleEdit(
 
     // 4. Cargar plantas
     const path = "plants.json";
-    std.Io.Dir.cwd().access(io, path, .{}) catch {
-        try stderr.print("No hay plantas registradas.\n", .{});
-        return;
-    };
-
-    const contenido = try std.Io.Dir.cwd().readFileAlloc(io, path, allocator, .limited(1024 * 1024));
-    defer allocator.free(contenido);
-
-    const parsed = try std.json.parseFromSlice([]Planta, allocator, contenido, .{});
-    defer parsed.deinit();
+    const plantsFromFile = try getPlantsFromFile(path, allocator, io, stderr);
+    defer plantsFromFile.deinit(allocator);
 
     var plantas: std.ArrayList(Planta) = .empty;
     defer plantas.deinit(allocator);
-    try plantas.appendSlice(allocator, parsed.value);
+    try plantas.appendSlice(allocator, plantsFromFile.parsed.value);
 
     // 5. Buscar la planta
     const plantIndex = blk: {
@@ -670,7 +643,6 @@ pub fn handleBackup(
 
     defer allocator.free(backupName);
 
-    // try std.fs.cwd().copyFile(sourcePath, backupName, .{});
     const contenido = try std.Io.Dir.cwd().readFileAlloc(io, sourcePath, allocator, .limited(10 * 1024 * 1024));
     defer allocator.free(contenido);
 
@@ -791,19 +763,12 @@ pub fn handleDelete(io: std.Io, iter: anytype, allocator: std.mem.Allocator, std
     };
 
     const path = "plants.json";
-    std.Io.Dir.cwd().access(io, path, .{}) catch {
-        try stderr.print("DB file might not be ready.\n", .{});
-        return;
-    };
-    const contenido = try std.Io.Dir.cwd().readFileAlloc(io, path, allocator, .limited(1024 * 1024));
-    defer allocator.free(contenido);
-
-    const parsed = try std.json.parseFromSlice([]Planta, allocator, contenido, .{});
-    defer parsed.deinit();
-    const plantas = parsed.value;
+    const plantsFromFile = try getPlantsFromFile(path, allocator, io, stderr);
+    defer plantsFromFile.deinit(allocator);
+    const plantas = plantsFromFile.parsed;
 
     var deleteIdx: ?usize = null;
-    for (plantas, 0..) |plantita, i| {
+    for (plantas.value, 0..) |plantita, i| {
         if (std.mem.eql(u8, plantita.id, plantIdStr)) {
             deleteIdx = i;
             break;
@@ -815,7 +780,7 @@ pub fn handleDelete(io: std.Io, iter: anytype, allocator: std.mem.Allocator, std
         var list: std.ArrayList(Planta) = .empty;
         defer list.deinit(allocator);
 
-        try list.appendSlice(allocator, plantas);
+        try list.appendSlice(allocator, plantas.value);
         _ = list.orderedRemove(idx);
 
         try guardarPlantas(path, list, io);
@@ -862,7 +827,7 @@ pub fn handleSearch(io: std.Io, iter: *std.process.Args.Iterator, allocator: std
 
     if (std.mem.eql(u8, seachOrRegexOption, "--regex")) {
         const regexPattern = iter.next() orelse {
-            try stderr.print("Error: falta el tipo (arbol|arbusto|cactacea)\n", .{});
+            try stderr.print("Error: --regex value missing\n", .{});
             return;
         };
         // Use the regex
