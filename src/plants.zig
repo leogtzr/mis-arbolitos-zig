@@ -246,6 +246,10 @@ fn printPlant(plant: *const Planta, stdout: *std.Io.Writer, showBitacora: bool) 
         try stdout.print("    Altura:  {d} cm\n", .{h});
     }
 
+    if (plant.fechaPlantado) |fecha| {
+        try stdout.print("    Plantado: {s}\n", .{fecha});
+    }
+
     try stdout.print("    Nativo:  {s}\n", .{if (plant.nativo) "Sí" else "No"});
 
     if (plant.estado) |estado| {
