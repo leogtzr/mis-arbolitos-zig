@@ -389,7 +389,15 @@ pub fn handleLog(
     // 7. Crear el nuevo evento:
     const now = std.Io.Clock.real.now(io);
     const timestamp_segundos = @divTrunc(now.nanoseconds, std.time.ns_per_s);
-    const fecha = try std.fmt.allocPrint(allocator, "{d}", .{timestamp_segundos});
+    const ts_u64: u64 = @intCast(timestamp_segundos);
+    const epochSeconds = std.time.epoch.EpochSeconds{ .secs = ts_u64 };
+    const epochDay = epochSeconds.getEpochDay();
+    const yearDay = epochDay.calculateYearDay();
+    const monthDay = yearDay.calculateMonthDay();
+    const year = yearDay.year;
+    const month = monthDay.month.numeric();
+    const day = monthDay.day_index + 1;
+    const fecha = try std.fmt.allocPrint(allocator, "{d}-{d:0>2}-{d:0>2}", .{ year, month, day });
     defer allocator.free(fecha);
 
     const evento = EventoCuidado{
